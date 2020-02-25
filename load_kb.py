@@ -1,14 +1,6 @@
 import json
 from collections import Counter
-
-def init_vocab():
-    return {
-        '<PAD>': 0,
-        '<UNK>': 1,
-        '<START>': 2,
-        '<END>': 3
-    }
-
+from utils import init_vocab
 
 """
 knowledge json format:
@@ -100,5 +92,63 @@ def get_kb_vocab(kb_json, min_cnt=1):
     return vocab
 
 
-def invert_dict(d):
-    return {v: k for k, v in d.items()}
+def load_as_key_value(kb_json, min_cnt=1):
+    """
+    For KVMemNN
+    Load each triple (s, r, o) as kv pairs (s+r, o) and (o+r_, s)
+    """
+    keys = ['<PAD>'] # use <PAD> as the first key
+    values = ['<PAD>']
+    def add_sro(s, r, o):
+        keys.append('{} {}'.format(s, r))
+        values.append(o)
+        keys.append('{} {}_'.format(o, r))
+        values.append(s)
+
+    kb = json.load(open(kb_json))
+    for i in kb['concepts']:
+        for j in kb['concepts'][i]['instanceOf']:
+            s = kb['concepts'][i]['name']
+            o = kb['concepts'][j]['name']
+            add_sro(s, 'instanceOf', o)
+    for i in kb['entities']:
+        for j in kb['entities'][i]['instanceOf']:
+            s = kb['entities'][i]['name']
+            o = kb['concepts'][j]['name']
+            add_sro(s, 'instanceOf', o)
+        name = kb['entities'][i]['name']
+        for attr_dict in kb['entities'][i]['attributes']:
+            o = '{} {}'.format(attr_dict['value']['value'], attr_dict['value'].get('unit', ''))
+            add_sro(name, attr_dict['key'], o)
+            s = '{} {} {}'.format(name, attr_dict['key'], o)
+            for qk, qvs in attr_dict['qualifiers'].items():
+                for qv in qvs:
+                    o = '{} {}'.format(qv['value'], qv.get('unit', ''))
+                    add_sro(s, qk, o)
+
+        for rel_dict in kb['entities'][i]['relations']:
+            if rel_dict['direction'] == 'backward': # we add reverse relation in add_sro
+                continue
+            o = kb['entities'].get(rel_dict['object'], kb['concepts'].get(rel_dict['object'], None))
+            if o is None: # wtf, why are some objects not in kb?
+                continue
+            o = o['name']
+            add_sro(name, rel_dict['predicate'], o)
+            s = '{} {} {}'.format(name, rel_dict['predicate'], o)
+            for qk, qvs in rel_dict['qualifiers'].items():
+                for qv in qvs:
+                    o = '{} {}'.format(qv['value'], qv.get('unit', ''))
+                    add_sro(s, qk, o)
+    print('length of kv pairs: {}'.format(len(keys)))
+    counter = Counter()
+    for i in range(len(keys)):
+        keys[i] = keys[i].lower().split()
+        values[i] = values[i].lower().split()
+        counter.update(keys[i])
+        counter.update(values[i])
+
+    vocab = init_vocab()
+    for v, c in counter.items():
+        if v and c >= min_cnt and v not in vocab:
+            vocab[v] = len(vocab)
+    return vocab, keys, values

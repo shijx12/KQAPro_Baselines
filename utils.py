@@ -1,7 +1,30 @@
-from collections import defaultdict
-from collections import deque
-
+from collections import defaultdict, Counter, deque
 import torch
+import json
+import pickle
+import numpy as np
+
+def init_vocab():
+    return {
+        '<PAD>': 0,
+        '<UNK>': 1,
+        '<START>': 2,
+        '<END>': 3
+    }
+
+def invert_dict(d):
+    return {v: k for k, v in d.items()}
+
+def load_glove(glove_pt, idx_to_token):
+    glove = pickle.load(open(glove_pt, 'rb'))
+    dim = len(glove['the'])
+    matrix = []
+    for i in range(len(idx_to_token)):
+        token = idx_to_token[i]
+        matrix.append(glove.get(token, np.zeros((dim,))))
+    matrix = np.asarray(matrix)
+    return matrix
+
 
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
