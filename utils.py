@@ -21,7 +21,15 @@ def load_glove(glove_pt, idx_to_token):
     matrix = []
     for i in range(len(idx_to_token)):
         token = idx_to_token[i]
-        matrix.append(glove.get(token, np.zeros((dim,))))
+        tokens = token.split()
+        if len(tokens) > 1:
+            v = np.zeros((dim,))
+            for token in tokens:
+                v = v + glove.get(token, glove['the'])
+            v = v / len(tokens)
+        else:
+            v = glove.get(token, glove['the'])
+        matrix.append(v)
     matrix = np.asarray(matrix)
     return matrix
 
