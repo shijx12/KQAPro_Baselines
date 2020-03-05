@@ -10,6 +10,11 @@ from tqdm import tqdm
 
 from utils import init_vocab
 
+max_ques_len = 80
+max_dep = 2
+max_inp = 3
+max_inp_len = 10
+
 
 def encode_dataset(dataset, vocab, test=False):
     questions = []
@@ -21,6 +26,7 @@ def encode_dataset(dataset, vocab, test=False):
     for question in tqdm(dataset):
         q = [vocab['word_token_to_idx'].get(w, vocab['word_token_to_idx']['<UNK>']) 
             for w in word_tokenize(question['text'].lower())]
+        q = q[:max_ques_len] # truncate questions
         questions.append(q)
 
         if test:
@@ -34,12 +40,16 @@ def encode_dataset(dataset, vocab, test=False):
         for f in program:
             func.append(vocab['function_token_to_idx'][f['function']])
             dep.append(f['dependencies'])
-            inp.append([vocab['word_token_to_idx'].get(w, vocab['word_token_to_idx']['<UNK>']) 
-                    for w in f['inputs']])
+            inp_ = []
+            for i in f['inputs']:
+                tokens = word_tokenize(i.lower())
+                inp_.append([vocab['word_token_to_idx'].get(w, vocab['word_token_to_idx']['<UNK>']) \
+                    for w in tokens])
+            inp.append(inp_)
 
         functions.append(func)
         func_depends.append(dep)
-        func_inputs.append(inp)        
+        func_inputs.append(inp)
 
         _ = [vocab['answer_token_to_idx'][w] for w in question['choices']]
         choices.append(_)
@@ -48,25 +58,30 @@ def encode_dataset(dataset, vocab, test=False):
 
     # question padding
     max_len = max(len(q) for q in questions)
-    for q in questions:
-        while len(q) < max_len:
-            q.append(vocab['word_token_to_idx']['<PAD>'])
+    for i in range(len(questions)):
+        while len(questions[i]) < max_len:
+            questions[i].append(vocab['word_token_to_idx']['<PAD>'])
 
     if not test:
         # function padding
         max_len = max(len(f) for f in functions)
-        max_dep = 2
-        max_inp = 0
-        for inp in func_inputs:
-            max_inp = max(max_inp, max(len(i) for i in inp))
         for i in range(len(functions)):
-            for j in range(len(functions[i])):
-                func_depends[i][j] += [-1] * (max_dep - len(func_depends[i][j])) # use -1 to pad dependency
-                func_inputs[i][j] += [vocab['word_token_to_idx']['<PAD>']] * (max_inp - len(func_inputs[i][j]))
             while len(functions[i]) < max_len:
                 functions[i].append(vocab['function_token_to_idx']['<PAD>'])
                 func_depends[i].append([-1, -1])
-                func_inputs[i].append([vocab['word_token_to_idx']['<PAD>']] * max_inp)
+                func_inputs[i].append([[], [], []])
+            for j in range(max_len):
+                while len(func_depends[i][j]) < max_dep:
+                    func_depends[i][j].append(-1) # use -1 to pad dependency
+                while len(func_inputs[i][j]) < max_inp:
+                    func_inputs[i][j].append([])
+                for k in range(max_inp):
+                    while len(func_inputs[i][j][k]) < max_inp_len:
+                        func_inputs[i][j][k].append(vocab['word_token_to_idx']['<PAD>'])
+                    # truncate input to max_inp_len
+                    # wrap each input with <START> and <END>
+                    func_inputs[i][j][k] = [vocab['word_token_to_idx']['<START>']] + \
+                        func_inputs[i][j][k][:max_inp_len] + [vocab['word_token_to_idx']['<END>']]
 
     questions = np.asarray(questions, dtype=np.int32)
     functions = np.asarray(functions, dtype=np.int32)
@@ -113,8 +128,10 @@ def main():
             a = f['function']
             if a not in vocab['function_token_to_idx']:
                 vocab['function_token_to_idx'][a] = len(vocab['function_token_to_idx'])
-            # consider function inputs as words
-            word_counter.update(f['inputs'])
+            # tokenize input
+            for i in f['inputs']:
+                tokens = word_tokenize(i.lower())
+                word_counter.update(tokens)
     # filter low-frequency words
     for w, c in word_counter.items():
         if w and c >= args.min_cnt and w not in vocab['word_token_to_idx']:

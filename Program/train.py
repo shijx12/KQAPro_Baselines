@@ -40,13 +40,14 @@ def validate_executor(executor, data):
     print('{}/{}/{:.4f}'.format(correct, count, correct/count))
 
 
-def validate(model, data, device):
+def validate(model, data, device, executor=None):
     model.eval()
     end_id = data.vocab['function_token_to_idx']['<END>']
     match_prog_num = 0
     match_dep_num = 0
     match_inp_num = 0
     match_all_num = 0
+    correct = 0
     count = 0
     with torch.no_grad():
         for batch in tqdm(data, total=len(data)):
@@ -56,12 +57,6 @@ def validate(model, data, device):
             gt_program, gt_dep, gt_inputs = [x.cpu().numpy() for x in (gt_program, gt_dep, gt_inputs)]
             pred_program, pred_dep, pred_inputs = [x.cpu().numpy() for x in (pred_program, pred_dep, pred_inputs)]
             
-            # for i in range(len(gt_program)):
-            #     print(gt_dep[i])
-            #     print('-')
-            #     print(pred_dep[i])
-            #     print('==========')
-
             for i in range(len(gt_program)):
                 match = True
                 for j in range(min(len(gt_program[i]), len(pred_program[i]))):
@@ -75,13 +70,20 @@ def validate(model, data, device):
                     match_prog_num += 1
                     if np.all(gt_dep[i,:l,:]==pred_dep[i,:l,:]):
                         match_dep_num += 1
-                    if np.all(gt_inputs[i,:l,:]==pred_inputs[i,:l,:]):
+                    if np.all(gt_inputs[i,:l,:,:]==pred_inputs[i,:l,:,:]):
                         match_inp_num += 1
                     if np.all(gt_dep[i,:l,:]==pred_dep[i,:l,:]) and \
-                        np.all(gt_inputs[i,:l,:]==pred_inputs[i,:l,:]):
+                        np.all(gt_inputs[i,:l,:,:]==pred_inputs[i,:l,:,:]):
                         match_all_num += 1
 
             count += len(gt_program)
+
+            if executor:
+                answer = [data.vocab['answer_idx_to_token'][a.item()] for a in answer]
+                for i in range(len(gt_program)):
+                    pred = executor.forward(pred_program[i], pred_dep[i], pred_inputs[i], ignore_error=True)
+                    if pred == answer[i]:
+                        correct += 1
 
     logging.info('\nValid match program: {:.4f}, dependencies: {:.4f}, inputs: {:.4f}, all: {:.4f}\n'.format(
         match_prog_num / count,
@@ -89,6 +91,8 @@ def validate(model, data, device):
         match_inp_num / count,
         match_all_num / count
         ))
+    if executor:
+        logging.info('Accuracy: {:.4f}\n'.format(correct / count))
 
 
 def train(args):
@@ -102,11 +106,7 @@ def train(args):
     val_loader = DataLoader(vocab_json, val_pt, args.batch_size)
     vocab = train_loader.vocab
 
-
     rule_executor = RuleExecutor(vocab, args.kb_json)
-    validate_executor(rule_executor, train_loader)
-    return
-
 
     logging.info("Create model.........")
     model = Parser(vocab, args.dim_word, args.dim_hidden)
@@ -123,7 +123,7 @@ def train(args):
     optimizer = optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[args.lr_decay_step], gamma=0.1)
 
-    validate(model, val_loader, device)
+    # validate(model, val_loader, device, rule_executor)
     meters = MetricLogger(delimiter="  ")
     logging.info("Start training........")
     for epoch in range(args.num_epoch):
@@ -153,10 +153,13 @@ def train(args):
                     )
                 )
         
-        # validate(model, val_loader, device)
-        validate(model, train_loader, device)
         torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
         scheduler.step()
+        if epoch == args.num_epoch-1:
+            validate(model, val_loader, device, rule_executor)
+        else:
+            validate(model, val_loader, device)
+
 
 
 def main():
@@ -173,7 +176,7 @@ def main():
     parser.add_argument('--weight_decay', default=1e-5, type=float)
     parser.add_argument('--num_epoch', default=20, type=int)
     parser.add_argument('--lr_decay_step', default=4, type=int)
-    parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
     # model hyperparameters
     parser.add_argument('--dim_word', default=300, type=int)

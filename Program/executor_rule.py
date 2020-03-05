@@ -156,7 +156,20 @@ class RuleExecutor(object):
     def forward(self, program, dependency, inputs, ignore_error=False, show_details=False):
         memory = []
         program = [self.vocab['function_idx_to_token'][p] for p in program]
-        inputs = [[self.vocab['word_idx_to_token'][i] for i in inp] for inp in inputs]
+        
+        idx_inputs = inputs
+        inputs = [['' for i in inp] for inp in inputs]
+        for i in range(len(idx_inputs)):
+            for j in range(len(idx_inputs[0])):
+                end_id = self.vocab['word_token_to_idx']['<END>']
+                if end_id in idx_inputs:
+                    end_idx = idx_inputs[i][j].index(end_id)
+                else:
+                    end_idx = len(idx_inputs[i][j])
+                start_idx = 1
+                tokens = idx_inputs[i][j][start_idx: end_idx]
+                inputs[i][j] = ' '.join([self.vocab['word_idx_to_token'][w] for w in tokens])
+
         try:
             for p, dep, inp in zip(program, dependency, inputs):
                 if p == '<START>':
