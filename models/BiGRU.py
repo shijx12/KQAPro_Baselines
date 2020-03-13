@@ -25,21 +25,22 @@ class GRU(nn.Module):
     def generate_sequence(self, word_lookup_func, h_0, classifier, vocab, max_step, early_stop=True):
         bsz = h_0.size(1)
         device = h_0.device
-        start_id, end_id = vocab['<START>'], vocab['<END>']
+        start_id, end_id, pad_id = vocab['<START>'], vocab['<END>'], vocab['<PAD>']
 
         latest = torch.LongTensor([start_id]*bsz).to(device) # [bsz, ]
         results = [latest]
         last_h = h_0
-        finished = torch.zeros((bsz,)).byte().to(device) # record whether <END> is produced
+        finished = torch.zeros((bsz,)).bool().to(device) # record whether <END> is produced
         for i in range(max_step-1): # exclude <START>
             word_emb = word_lookup_func(latest).unsqueeze(1) # [bsz, 1, dim_w]
             word_h, last_h = self.forward_one_step(word_emb, last_h) # [bsz, 1, dim_h]
 
             logit = classifier(word_h).squeeze(1) # [bsz, num_func]
             latest = torch.argmax(logit, dim=1).long() # [bsz, ]
+            latest[finished] = pad_id # set to <PAD> after <END>
             results.append(latest)
 
-            finished = finished | latest.eq(end_id).byte()
+            finished = finished | latest.eq(end_id).bool()
             if early_stop and finished.sum().item() == bsz:
                 # print('finished at step {}'.format(i))
                 break

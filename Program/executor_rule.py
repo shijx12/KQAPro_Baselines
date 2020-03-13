@@ -46,8 +46,9 @@ constrains = {                          # dependencies, inputs, returns, functio
 
 
 class RuleExecutor(object):
-    def __init__(self, vocab, kb_json):
+    def __init__(self, vocab, kb_json, sequential_input=False):
         self.vocab = vocab
+        self.sequential_input = sequential_input
         print('load kb')
         kb = json.load(open(kb_json))
         self.concepts = kb['concepts']
@@ -153,22 +154,26 @@ class RuleExecutor(object):
         return ancestors
 
 
-    def forward(self, program, dependency, inputs, ignore_error=False, show_details=False):
+    def forward(self, program, dependency, inputs, 
+                ignore_error=False, show_details=False):
         memory = []
         program = [self.vocab['function_idx_to_token'][p] for p in program]
         
-        idx_inputs = inputs
-        inputs = [['' for i in inp] for inp in inputs]
-        for i in range(len(idx_inputs)):
-            for j in range(len(idx_inputs[0])):
-                end_id = self.vocab['word_token_to_idx']['<END>']
-                if end_id in idx_inputs:
-                    end_idx = idx_inputs[i][j].index(end_id)
-                else:
-                    end_idx = len(idx_inputs[i][j])
-                start_idx = 1
-                tokens = idx_inputs[i][j][start_idx: end_idx]
-                inputs[i][j] = ' '.join([self.vocab['word_idx_to_token'][w] for w in tokens])
+        if self.sequential_input:
+            idx_inputs = inputs
+            inputs = [['' for i in inp] for inp in inputs]
+            for i in range(len(idx_inputs)):
+                for j in range(len(idx_inputs[0])):
+                    end_id = self.vocab['word_token_to_idx']['<END>']
+                    if end_id in idx_inputs[i][j]:
+                        end_idx = idx_inputs[i][j].tolist().index(end_id)
+                    else:
+                        end_idx = len(idx_inputs[i][j])
+                    start_idx = 1
+                    tokens = idx_inputs[i][j][start_idx: end_idx]
+                    inputs[i][j] = ' '.join([self.vocab['word_idx_to_token'][w] for w in tokens])
+        else:
+            inputs = [[self.vocab['word_idx_to_token'][i] for i in inp] for inp in inputs]
 
         try:
             for p, dep, inp in zip(program, dependency, inputs):

@@ -34,17 +34,20 @@ def encode_dataset(dataset, vocab, test=False):
 
         func, dep, inp = [], [], []
         # wrap program with <START> and <END> flags
-        program = [{'function':'<START>','dependencies':[-1,-1],'inputs':['<PAD>']}] + \
+        program = [{'function':'<START>','dependencies':[-1,-1],'inputs':['']}] + \
                 question['program'] + \
-                [{'function':'<END>','dependencies':[-1,-1],'inputs':['<PAD>']}]
+                [{'function':'<END>','dependencies':[-1,-1],'inputs':['']}]
         for f in program:
             func.append(vocab['function_token_to_idx'][f['function']])
             dep.append(f['dependencies'])
             inp_ = []
             for i in f['inputs']:
-                tokens = word_tokenize(i.lower())
-                inp_.append([vocab['word_token_to_idx'].get(w, vocab['word_token_to_idx']['<UNK>']) \
-                    for w in tokens])
+                if i:
+                    tokens = word_tokenize(i.lower())
+                    inp_.append([vocab['word_token_to_idx'].get(w, vocab['word_token_to_idx']['<UNK>']) \
+                        for w in tokens])
+                else:
+                    inp_.append([])
             inp.append(inp_)
 
         functions.append(func)
@@ -76,12 +79,13 @@ def encode_dataset(dataset, vocab, test=False):
                 while len(func_inputs[i][j]) < max_inp:
                     func_inputs[i][j].append([])
                 for k in range(max_inp):
-                    while len(func_inputs[i][j][k]) < max_inp_len:
-                        func_inputs[i][j][k].append(vocab['word_token_to_idx']['<PAD>'])
                     # truncate input to max_inp_len
-                    # wrap each input with <START> and <END>
+                    # wrap each input with <START> and <END> before padding
                     func_inputs[i][j][k] = [vocab['word_token_to_idx']['<START>']] + \
                         func_inputs[i][j][k][:max_inp_len] + [vocab['word_token_to_idx']['<END>']]
+                    # padding to max_inp_len+2 (with <START> and <END>)
+                    while len(func_inputs[i][j][k]) < max_inp_len + 2:
+                        func_inputs[i][j][k].append(vocab['word_token_to_idx']['<PAD>'])
 
     questions = np.asarray(questions, dtype=np.int32)
     functions = np.asarray(functions, dtype=np.int32)
