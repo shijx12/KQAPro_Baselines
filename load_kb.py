@@ -1,6 +1,8 @@
 import json
 from collections import Counter
 from utils import init_vocab
+from datetime import date
+from value_class import ValueClass
 
 """
 knowledge json format:
@@ -152,3 +154,67 @@ def load_as_key_value(kb_json, min_cnt=1):
         if v and c >= min_cnt and v not in vocab:
             vocab[v] = len(vocab)
     return vocab, keys, values
+
+
+class DataForSPARQL(object):
+    def __init__(self, kb_path):
+        kb = json.load(open(kb_path))
+        self.concepts = kb['concepts']
+        self.entities = kb['entities']
+
+        # replace adjacent space and tab in name, which may cause errors when building sparql query
+        for con_id, con_info in self.concepts.items():
+            con_info['name'] = ' '.join(con_info['name'].split())
+        for ent_id, ent_info in self.entities.items():
+            ent_info['name'] = ' '.join(ent_info['name'].split())
+
+        # get all attribute keys and predicates
+        self.attribute_keys = set()
+        self.predicates = set()
+        self.key_type = {}
+        for ent_id, ent_info in self.entities.items():
+            for attr_info in ent_info['attributes']:
+                self.attribute_keys.add(attr_info['key'])
+                self.key_type[attr_info['key']] = attr_info['value']['type']
+                for qk in attr_info['qualifiers']:
+                    self.attribute_keys.add(qk)
+                    for qv in attr_info['qualifiers'][qk]:
+                        self.key_type[qk] = qv['type']
+        for ent_id, ent_info in self.entities.items():
+            for rel_info in ent_info['relations']:
+                self.predicates.add(rel_info['predicate'])
+                for qk in rel_info['qualifiers']:
+                    self.attribute_keys.add(qk)
+                    for qv in rel_info['qualifiers'][qk]:
+                        self.key_type[qk] = qv['type']
+        self.attribute_keys = list(self.attribute_keys)
+        self.predicates = list(self.predicates)
+        # Note: key_type is one of string/quantity/date, but date means the key may have values of type year
+        self.key_type = { k:v if v!='year' else 'date' for k,v in self.key_type.items() }
+
+        # parse values into ValueClass object
+        for ent_id, ent_info in self.entities.items():
+            for attr_info in ent_info['attributes']:
+                attr_info['value'] = self._parse_value(attr_info['value'])
+                for qk, qvs in attr_info['qualifiers'].items():
+                    attr_info['qualifiers'][qk] = [self._parse_value(qv) for qv in qvs]
+        for ent_id, ent_info in self.entities.items():
+            for rel_info in ent_info['relations']:
+                for qk, qvs in rel_info['qualifiers'].items():
+                    rel_info['qualifiers'][qk] = [self._parse_value(qv) for qv in qvs]
+
+    def _parse_value(self, value):
+        if value['type'] == 'date':
+            x = value['value']
+            p1, p2 = x.find('/'), x.rfind('/')
+            y, m, d = int(x[:p1]), int(x[p1+1:p2]), int(x[p2+1:])
+            result = ValueClass('date', date(y, m, d))
+        elif value['type'] == 'year':
+            result = ValueClass('year', value['value'])
+        elif value['type'] == 'string':
+            result = ValueClass('string', value['value'])
+        elif value['type'] == 'quantity':
+            result = ValueClass('quantity', value['value'], value['unit'])
+        else:
+            raise Exception('unsupport value type')
+        return result

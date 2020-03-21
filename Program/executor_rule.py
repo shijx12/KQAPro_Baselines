@@ -1,4 +1,4 @@
-from .value_class import ValueClass, comp
+from value_class import ValueClass, comp
 import json
 from collections import defaultdict
 from datetime import date

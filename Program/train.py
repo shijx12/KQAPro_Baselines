@@ -82,7 +82,7 @@ def validate(model, data, device, executor=None):
                     if np.all(gt_inputs[i,1:l,:]==pred_inputs[i,1:l,:]):
                         match_inp_num += 1
                     if np.all(gt_dep[i,1:l,:]==pred_dep[i,1:l,:]) and \
-                        np.all(gt_inputs[i,1:l,:,:]==pred_inputs[i,1:l,:,:]):
+                        np.all(gt_inputs[i,1:l,:]==pred_inputs[i,1:l,:]):
                         match_all_num += 1
 
             count += len(gt_program)
@@ -190,9 +190,9 @@ def main():
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--weight_decay', default=1e-5, type=float)
-    parser.add_argument('--num_epoch', default=20, type=int)
-    parser.add_argument('--lr_decay_step', default=5, type=int)
-    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--num_epoch', default=10, type=int)
+    parser.add_argument('--lr_decay_step', default=2, type=int)
+    parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
     # model hyperparameters
     parser.add_argument('--sequential_input', action='store_true')

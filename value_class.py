@@ -108,7 +108,11 @@ class ValueClass():
         if self.type == 'string':
             return self.value
         elif self.type == 'quantity':
-            return '{} {}'.format(self.value, self.unit) if self.unit != '1' else str(self.value)
+            if self.value - int(self.value) < 1e-5:
+                v = int(self.value)
+            else:
+                v = self.value
+            return '{} {}'.format(v, self.unit) if self.unit != '1' else str(v)
         elif self.type == 'year':
             return str(self.value)
         elif self.type == 'date':
