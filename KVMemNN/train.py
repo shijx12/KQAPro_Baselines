@@ -34,6 +34,7 @@ def validate(model, data, device):
     logging.info('\nValid Accuracy: %.4f\n' % acc)
 
 
+
 def train(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -104,7 +105,7 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--glove_pt', default='/data/sjx/glove.840B.300d.py36.pt')
+    parser.add_argument('--glove_pt', default='/data/csl/resources/word2vec/glove.840B.300d.py36.pt')
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
@@ -118,9 +119,8 @@ def main():
     args = parser.parse_args()
 
     # make logging.info display into both shell and file
-    if os.path.isdir(args.save_dir):
-        shutil.rmtree(args.save_dir)
-    os.mkdir(args.save_dir)
+    if not os.path.exists(args.save_dir):
+        os.makedirs(args.save_dir)
     fileHandler = logging.FileHandler(os.path.join(args.save_dir, 'log.txt'))
     fileHandler.setFormatter(logFormatter)
     rootLogger.addHandler(fileHandler)

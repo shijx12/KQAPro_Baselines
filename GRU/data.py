@@ -1,12 +1,11 @@
 import json
 import pickle
 import torch
-from data.utils import invert_dict
+from utils import invert_dict
 
 
 def load_vocab(path):
     vocab = json.load(open(path))
-    vocab['kb_idx_to_token'] = invert_dict(vocab['kb_token_to_idx'])
     vocab['word_idx_to_token'] = invert_dict(vocab['word_token_to_idx'])
     vocab['function_idx_to_token'] = invert_dict(vocab['function_token_to_idx'])
     vocab['sparql_idx_to_token'] = invert_dict(vocab['sparql_token_to_idx'])
@@ -58,8 +57,8 @@ class DataLoader(torch.utils.data.DataLoader):
     def __init__(self, vocab_json, question_pt, batch_size, training=False):
         vocab = load_vocab(vocab_json)
         if training:
-            print('#vocab of kb/word/function/sparql/answer: %d/%d/%d/%d/%d' % 
-                (len(vocab['kb_token_to_idx']), len(vocab['word_token_to_idx']), 
+            print('#vocab of word/function/sparql/answer: %d/%d/%d/%d' % 
+                (len(vocab['word_token_to_idx']), 
                 len(vocab['function_token_to_idx']), len(vocab['sparql_token_to_idx']), len(vocab['answer_token_to_idx'])))
         
         inputs = []

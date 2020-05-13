@@ -23,7 +23,7 @@ def encode_dataset(dataset, vocab, test=False):
     answers = []
     for question in tqdm(dataset):
         q = [vocab['word_token_to_idx'].get(w, vocab['word_token_to_idx']['<UNK>']) 
-            for w in word_tokenize(question['text'].lower())]
+            for w in word_tokenize(question['rewrite'].lower())]
         questions.append(q)
 
         if test:
@@ -103,7 +103,7 @@ def main():
     print('Build question vocabulary')
     word_counter = Counter()
     for question in train_set:
-        tokens = word_tokenize(question['text'].lower())
+        tokens = word_tokenize(question['rewrite'].lower())
         word_counter.update(tokens)
         # add candidate answers
         for a in question['choices']:

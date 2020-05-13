@@ -27,7 +27,7 @@ def find_candidate_keys(inverted_index, stopwords, question, num_cand_keys):
     find keys that are relevant to question, and then return the top num_cand_keys
     if not enough, pad 0
     """
-    words = word_tokenize(question['text'].lower())
+    words = word_tokenize(question['rewrite'].lower())
     counter = Counter()
     for w in words:
         if w in stopwords: # skip stopwords
@@ -68,7 +68,7 @@ def encode_dataset(dataset, vocab, inverted_index, stopwords, num_cand_keys):
     answers = []
     for question in tqdm(dataset):
         q = [vocab['word_token_to_idx'].get(w, vocab['word_token_to_idx']['<UNK>']) 
-            for w in word_tokenize(question['text'].lower())]
+            for w in word_tokenize(question['rewrite'].lower())]
         questions.append(q)
 
         key_indexes.append(find_candidate_keys(inverted_index, stopwords, question, num_cand_keys))
@@ -116,7 +116,7 @@ def main():
     print('Build question vocabulary')
     word_counter = Counter()
     for question in train_set:
-        tokens = word_tokenize(question['text'].lower())
+        tokens = word_tokenize(question['rewrite'].lower())
         word_counter.update(tokens)
         # add candidate answers
         for a in question['choices']:

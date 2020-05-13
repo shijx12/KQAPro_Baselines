@@ -6,7 +6,7 @@ import argparse
 import shutil
 from tqdm import tqdm
 
-from utils import MetricLogger
+from utils import MetricLogger, load_glove
 from GRU.data import DataLoader
 from GRU.model import GRUClassifier
 
@@ -46,6 +46,10 @@ def train(args):
 
     logging.info("Create model.........")
     model = GRUClassifier(vocab, args.dim_word, args.dim_hidden)
+    logging.info("Load pretrained word vectors.........")
+    pretrained = load_glove(args.glove_pt, vocab['word_idx_to_token'])
+    with torch.no_grad():
+        model.word_embeddings.weight.set_(torch.Tensor(pretrained))
     model = model.to(device)
     logging.info(model)
 
@@ -101,6 +105,7 @@ def main():
     parser.add_argument('--num_epoch', default=10, type=int)
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
+    parser.add_argument('--glove_pt', default='/data/csl/resources/word2vec/glove.840B.300d.py36.pt')
     # model hyperparameters
     parser.add_argument('--dim_word', default=300, type=int)
     parser.add_argument('--dim_hidden', default=1024, type=int)
