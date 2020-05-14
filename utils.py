@@ -3,7 +3,101 @@ import torch
 import json
 import pickle
 import numpy as np
+import torch.nn as nn
+START_RELATION = 'START_RELATION'
+NO_OP_RELATION = 'NO_OP_RELATION'
+NO_OP_ENTITY = 'NO_OP_ENTITY'
+DUMMY_RELATION = 'DUMMY_RELATION'
+DUMMY_ENTITY = 'DUMMY_ENTITY'
 
+DUMMY_RELATION_ID = 0
+START_RELATION_ID = 1
+NO_OP_RELATION_ID = 2
+DUMMY_ENTITY_ID = 0
+NO_OP_ENTITY_ID = 1
+
+EPSILON = float(np.finfo(float).eps)
+HUGE_INT = 1e31
+
+def format_path(path_trace, id2entity, id2relation):
+    def get_most_recent_relation(j):
+        relation_id = int(path_trace[j][0])
+        if relation_id == NO_OP_RELATION_ID:
+            return '<null>'
+        else:
+            return id2relation[relation_id]
+
+    def get_most_recent_entity(j):
+        return id2entity[int(path_trace[j][1])]
+
+    path_str = get_most_recent_entity(0)
+    for j in range(1, len(path_trace)):
+        rel = get_most_recent_relation(j)
+        if not rel.endswith('_inv'):
+            path_str += ' -{}-> '.format(rel)
+        else:
+            path_str += ' <-{}- '.format(rel[:-4])
+        path_str += get_most_recent_entity(j)
+    return path_str
+
+def pad_and_cat(a, padding_value, padding_dim=1):
+    max_dim_size = max([x.size()[padding_dim] for x in a])
+    padded_a = []
+    for x in a:
+        if x.size()[padding_dim] < max_dim_size:
+            res_len = max_dim_size - x.size()[1]
+            pad = nn.ConstantPad1d((0, res_len), padding_value)
+            padded_a.append(pad(x))
+        else:
+            padded_a.append(x)
+    return torch.cat(padded_a, dim=0)
+
+def safe_log(x):
+    return torch.log(x + EPSILON)
+
+def entropy(p):
+    return torch.sum(- p * safe_log(p), 1)
+
+def init_word2id():
+    return {
+        '<PAD>': 0,
+        '<UNK>': 1,
+        'E_S': 2,
+    }
+def init_entity2id():
+    return {
+        DUMMY_ENTITY: DUMMY_ENTITY_ID,
+        NO_OP_ENTITY: NO_OP_ENTITY_ID
+    }
+def init_relation2id():
+    return {
+        DUMMY_RELATION: DUMMY_RELATION_ID,
+        START_RELATION: START_RELATION_ID,
+        NO_OP_RELATION: NO_OP_RELATION_ID
+    }
+
+def add_item_to_x2id(item, x2id):
+    if not item in x2id:
+        x2id[item] = len(x2id)
+
+def tile_along_beam(v, beam_size, dim=0):
+    """
+    Tile a tensor along a specified dimension for the specified beam size.
+    :param v: Input tensor.
+    :param beam_size: Beam size.
+    """
+    if dim == -1:
+        dim = len(v.size()) - 1
+    v = v.unsqueeze(dim + 1)
+    v = torch.cat([v] * beam_size, dim=dim+1)
+    new_size = []
+    for i, d in enumerate(v.size()):
+        if i == dim + 1:
+            new_size[-1] *= d
+        else:
+            new_size.append(d)
+    return v.view(new_size)
+        
 def init_vocab():
     return {
         '<PAD>': 0,

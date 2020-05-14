@@ -8,7 +8,7 @@ from collections import Counter
 from itertools import chain
 from tqdm import tqdm
 
-from utils import get_kb_vocab, init_vocab
+from utils import init_vocab
 
 
 def tokenize_sparql(s): 
@@ -25,14 +25,14 @@ def encode_dataset(dataset, vocab, test=False):
     answers = []
     for question in tqdm(dataset):
         q = [vocab['word_token_to_idx'].get(w, vocab['word_token_to_idx']['<UNK>']) 
-            for w in word_tokenize(question['text'].lower())]
+            for w in word_tokenize(question['rewrite'].lower())]
         questions.append(q)
 
         _ = [vocab['answer_token_to_idx'][w] for w in question['choices']]
         choices.append(_)
 
-        if test:
-            continue
+        # if test:
+        #     continue
 
         func, dep, inp = [], [], []
         for f in question['program']:
@@ -56,26 +56,26 @@ def encode_dataset(dataset, vocab, test=False):
     for q in questions:
         while len(q) < max_len:
             q.append(vocab['word_token_to_idx']['<PAD>'])
-    if not test:
-        # function padding
-        max_len = max(len(f) for f in functions)
-        max_dep = 2
-        max_inp = 0
-        for inp in func_inputs:
-            max_inp = max(max_inp, max(len(i) for i in inp))
-        for i in range(len(functions)):
-            for j in range(len(functions[i])):
-                func_depends[i][j] += [-1] * (max_dep - len(func_depends[i][j])) # use -1 to pad dependency
-                func_inputs[i][j] += [vocab['word_token_to_idx']['<PAD>']] * (max_inp - len(func_inputs[i][j]))
-            while len(functions[i]) < max_len:
-                functions[i].append(vocab['function_token_to_idx']['<PAD>'])
-                func_depends[i].append([-1, -1])
-                func_inputs[i].append([vocab['word_token_to_idx']['<PAD>']] * max_inp)
-        # sparql padding
-        max_len = max(len(s) for s in sparqls)
-        for s in sparqls:
-            while len(s) < max_len:
-                s.append(vocab['sparql_token_to_idx']['<PAD>'])
+
+    # function padding
+    max_len = max(len(f) for f in functions)
+    max_dep = 2
+    max_inp = 0
+    for inp in func_inputs:
+        max_inp = max(max_inp, max(len(i) for i in inp))
+    for i in range(len(functions)):
+        for j in range(len(functions[i])):
+            func_depends[i][j] += [-1] * (max_dep - len(func_depends[i][j])) # use -1 to pad dependency
+            func_inputs[i][j] += [vocab['word_token_to_idx']['<PAD>']] * (max_inp - len(func_inputs[i][j]))
+        while len(functions[i]) < max_len:
+            functions[i].append(vocab['function_token_to_idx']['<PAD>'])
+            func_depends[i].append([-1, -1])
+            func_inputs[i].append([vocab['word_token_to_idx']['<PAD>']] * max_inp)
+    # sparql padding
+    max_len = max(len(s) for s in sparqls)
+    for s in sparqls:
+        while len(s) < max_len:
+            s.append(vocab['sparql_token_to_idx']['<PAD>'])
 
     questions = np.asarray(questions, dtype=np.int32)
     functions = np.asarray(functions, dtype=np.int32)
@@ -96,10 +96,8 @@ def main():
     args = parser.parse_args()
 
 
-    print('Build kb vocabulary')
-    vocab_kb = get_kb_vocab(os.path.join(args.input_dir, 'kb.json'), args.min_cnt)
+
     vocab = {
-        'kb_token_to_idx': vocab_kb,
         'word_token_to_idx': init_vocab(), # include question text and function inputs
         'function_token_to_idx': init_vocab(),
         'sparql_token_to_idx': init_vocab(),
@@ -112,7 +110,7 @@ def main():
     print('Build question vocabulary')
     word_counter = Counter()
     for question in train_set:
-        tokens = word_tokenize(question['text'].lower())
+        tokens = word_tokenize(question['rewrite'].lower())
         word_counter.update(tokens)
         # add candidate answers
         for a in question['choices']:
