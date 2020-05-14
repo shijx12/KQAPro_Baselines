@@ -190,7 +190,7 @@ def main():
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--weight_decay', default=1e-5, type=float)
-    parser.add_argument('--num_epoch', default=10, type=int)
+    parser.add_argument('--num_epoch', default=80, type=int)
     parser.add_argument('--lr_decay_step', default=2, type=int)
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')

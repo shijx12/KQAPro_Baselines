@@ -233,8 +233,8 @@ def check_sparql(sparql, given_answer, program, data):
             given_answer = legal(given_answer)
         if parsed_answer == given_answer:
             return True
-        else:
-            print(parsed_answer, given_answer)
+        # else:
+        #     print(parsed_answer, given_answer)
     except Exception:
         return False
 
