@@ -142,8 +142,90 @@ def query_virtuoso(q):
     res = gs1.query(q)
     return res
 
+
+def get_sparql_answer(sparql, last_function, data):
+    """
+    last_function: to determine the parse_type
+    data: DataForSPARQL object, we need the key_type
+    """
+    # get parse_type based on the last function
+    f = last_function['function']
+    if f in {'What', 'SelectAmong', 'SelectBetween'}:
+        parse_type = 'name'
+    elif f == 'Count':
+        parse_type = 'count'
+    elif f in {'QueryAttr', 'QueryAttrUnderCondition', 'QueryAttrQualifier', 'QueryRelationQualifier'}:
+        if f in {'QueryAttr', 'QueryAttrUnderCondition'}:
+            key = last_function['inputs'][0]
+        elif f == 'QueryAttrQualifier':
+            key = last_function['inputs'][2]
+        elif f == 'QueryRelationQualifier':
+            key = last_function['inputs'][1]
+        t = data.key_type[key]
+        parse_type = 'attr_{}'.format(t)
+    elif f in {'VerifyStr', 'VerifyNum', 'VerifyDate', 'VerifyYear'}:
+        parse_type = 'bool'
+    elif f in {'QueryRelation'}:
+        parse_type = 'pred'
+
+    try:
+        parsed_answer = None
+        res = query_virtuoso(sparql)
+        if res.vars:
+            res = [[binding[v] for v in res.vars] for binding in res.bindings]
+            if len(res) != 1:
+                return None
+        else:
+            res = res.askAnswer
+            assert parse_type == 'bool'
+        
+        if parse_type == 'name':
+            node = res[0][0]
+            sp = 'SELECT DISTINCT ?v WHERE {{ <{}> <{}> ?v .  }}'.format(node, SparqlEngine.PRED_NAME)
+            res = query_virtuoso(sp)
+            res = [[binding[v] for v in res.vars] for binding in res.bindings]
+            name = res[0][0].value
+            parsed_answer = name
+        elif parse_type == 'count':
+            count = res[0][0].value
+            parsed_answer = str(count)
+        elif parse_type.startswith('attr_'):
+            node = res[0][0]
+            v_type = parse_type.split('_')[1]
+            unit = None
+            if v_type == 'string':
+                sp = 'SELECT DISTINCT ?v WHERE {{ <{}> <{}> ?v .  }}'.format(node, SparqlEngine.PRED_VALUE)
+            elif v_type == 'quantity':
+                # Note: For those large number, ?v is truncated by virtuoso (e.g., 14756087 to 1.47561e+07)
+                # To obtain the accurate ?v, we need to cast it to str
+                sp = 'SELECT DISTINCT ?v,?u,(str(?v) as ?sv) WHERE {{ <{}> <{}> ?v ; <{}> ?u .  }}'.format(node, SparqlEngine.PRED_VALUE, SparqlEngine.PRED_UNIT)
+            elif v_type == 'year':
+                sp = 'SELECT DISTINCT ?v WHERE {{ <{}> <{}> ?v .  }}'.format(node, SparqlEngine.PRED_YEAR)
+            elif v_type == 'date':
+                sp = 'SELECT DISTINCT ?v WHERE {{ <{}> <{}> ?v .  }}'.format(node, SparqlEngine.PRED_DATE)
+            else:
+                raise Exception('unsupported parse type')
+            res = query_virtuoso(sp)
+            res = [[binding[v] for v in res.vars] for binding in res.bindings]
+            if v_type == 'quantity':
+                value = float(res[0][2].value)
+                unit = res[0][1].value
+            else:
+                value = res[0][0].value
+            value = ValueClass(v_type, value, unit)
+            parsed_answer = str(value)
+        elif parse_type == 'bool':
+            parsed_answer = 'yes' if res else 'no'
+        elif parse_type == 'pred':
+            parsed_answer = str(res[0][0])
+        return parsed_answer
+    except Exception:
+        return None
+
+
 def check_sparql(sparql, given_answer, program, data):
     """
+    program: we need the last function to help extract the accurate answer
     data: DataForSPARQL object, we need the key_type
     """
     # get parse_type based on the last function

@@ -2,6 +2,7 @@ import json
 from collections import Counter
 from utils import init_vocab
 from datetime import date
+from queue import Queue
 from value_class import ValueClass
 
 """
@@ -74,7 +75,7 @@ def get_kb_vocab(kb_json, min_cnt=1):
                 u = value.get('unit', '')
                 if u:
                     counter.update([u])
-                counter.update([str(value['value'])+u])
+                counter.update([str(value['value'])])
         for rel_dict in kb['entities'][i]['relations']:
             counter.update([rel_dict['predicate'], rel_dict['direction']])
             values = []
@@ -85,13 +86,58 @@ def get_kb_vocab(kb_json, min_cnt=1):
                 u = value.get('unit', '')
                 if u:
                     counter.update([u])
-                counter.update([str(value['value'])+u])
+                counter.update([str(value['value'])])
 
     vocab = init_vocab()
     for v, c in counter.items():
         if v and c >= min_cnt and v not in vocab:
             vocab[v] = len(vocab)
-    return vocab
+    return kb, vocab
+
+
+def load_as_graph(kb_json, max_desc=200, min_cnt=1):
+    kb, vocab = get_kb_vocab(kb_json, min_cnt)
+    id2idx = {}
+    pred2idx = {}
+    node_descs = []
+    triples = []
+    for i, info in kb['concepts'].items():
+        id2idx[i] = len(id2idx)
+        desc = [info['name']]
+        node_descs.append(desc)
+    for i, info in kb['entities'].items():
+        id2idx[i] = len(id2idx)
+        desc = [info['name']]
+        for attr_info in info['attributes']:
+            desc.append(attr_info['key'])
+            desc.append(str(attr_info['value']['value']))
+            u = attr_info['value'].get('unit', '')
+            if u:
+                desc.append(u)
+        node_descs.append(desc)
+        for rel_info in info['relations']:
+            obj_id = rel_info['object']
+            if obj_id not in id2idx:
+                continue
+            pred = rel_info['predicate']
+            if pred not in pred2idx:
+                pred2idx[pred] = len(pred2idx)
+            pred_idx = pred2idx[pred]
+            sub_idx = id2idx[i]
+            obj_idx = id2idx[obj_id]
+            if rel_info['direction'] == 'forward':
+                triples.append((sub_idx, pred_idx, obj_idx))
+            else:
+                triples.append((obj_idx, pred_idx, sub_idx))
+    # encode and pad desc
+    for i, desc in enumerate(node_descs):
+        desc = [vocab.get(w, vocab['<UNK>']) for w in desc]
+        while len(desc) < max_desc:
+            desc.append(vocab['<PAD>'])
+        node_descs[i] = desc[:max_desc]
+
+    return vocab, node_descs, triples, id2idx, pred2idx
+
 
 
 def load_as_key_value(kb_json, min_cnt=1):
@@ -218,3 +264,41 @@ class DataForSPARQL(object):
         else:
             raise Exception('unsupport value type')
         return result
+
+    def get_direct_concepts(self, ent_id):
+        """
+        return the direct concept id of given entity/concept
+        """
+        if ent_id in self.entities:
+            return self.entities[ent_id]['instanceOf']
+        elif ent_id in self.concepts:
+            return self.concepts[ent_id]['instanceOf']
+        else:
+            raise Exception('unknown id')
+
+    def get_all_concepts(self, ent_id):
+        """
+        return a concept id list
+        """
+        ancestors = []
+        q = Queue()
+        for c in self.get_direct_concepts(ent_id):
+            q.put(c)
+        while not q.empty():
+            con_id = q.get()
+            ancestors.append(con_id)
+            for c in self.concepts[con_id]['instanceOf']:
+                q.put(c)
+
+        return ancestors
+
+    def get_name(self, ent_id):
+        if ent_id in self.entities:
+            return self.entities[ent_id]['name']
+        elif ent_id in self.concepts:
+            return self.concepts[ent_id]['name']
+        else:
+            return None
+
+    def is_concept(self, ent_id):
+        return ent_id in self.concepts

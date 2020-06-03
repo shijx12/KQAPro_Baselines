@@ -105,9 +105,9 @@ def train(args):
     logging.info(model)
 
     optimizer = optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[3], gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[args.lr_decay_step], gamma=0.1)
 
-    # validate(args, model, val_loader, device)
+    validate(args, model, val_loader, device)
     meters = MetricLogger(delimiter="  ")
     logging.info("Start training........")
     for epoch in range(args.num_epoch):
@@ -138,8 +138,9 @@ def train(args):
                 )
         
         validate(args, model, val_loader, device)
-        torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
         scheduler.step()
+        if (epoch+1)%10 == 0:
+            torch.save(model.state_dict(), os.path.join(args.save_dir, 'model_{}.pt'.format(epoch)))
 
 
 def main():
@@ -147,14 +148,15 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--kb_path', default='./test_dataset/kb.json')
-    parser.add_argument('--val_path', default='./test_dataset/val.json')
+    parser.add_argument('--kb_path', required=True)
+    parser.add_argument('--val_path', required=True)
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
+    parser.add_argument('--lr_decay_step', default=5, type=int)
     parser.add_argument('--weight_decay', default=1e-5, type=float)
-    parser.add_argument('--num_epoch', default=50, type=int)
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--num_epoch', default=100, type=int)
+    parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
     # model hyperparameters
     parser.add_argument('--dim_word', default=300, type=int)

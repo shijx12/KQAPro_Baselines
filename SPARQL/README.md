@@ -79,5 +79,5 @@ python -m SPARQL.preprocess --input_dir ./test_dataset --output_dir /data/sjx/ex
 ```
 5. sparql engine has been prepared well, now you can run `train.py` with following command
 ```
-CUDA_VISIBLE_DEVICES=7 python -m SPARQL.train --input_dir /data/sjx/exp/KBQA/SPARQL --save_dir /data/sjx/exp/KBQA/SPARQL/debug
+CUDA_VISIBLE_DEVICES=7 python -m SPARQL.train --input_dir /data/sjx/exp/KBQA/SPARQL --save_dir /data/sjx/exp/KBQA/SPARQL/debug --kb_path /data/sjx/dataset/KQApro/release/kb.json --val_path /data/sjx/dataset/KQApro/release/val.json
 ```
