@@ -34,6 +34,7 @@ def validate(model, data, device):
 
     acc = correct / count
     logging.info('\nValid Accuracy: %.4f\n' % acc)
+    return acc
 
 
 def train(args):
@@ -46,7 +47,7 @@ def train(args):
     kb_pt = os.path.join(args.input_dir, 'kb.pt')
     train_loader = DataLoader(vocab_json, kb_pt, train_pt, args.batch_size, training=True)
     train_loader_large_bsz = DataLoader(vocab_json, kb_pt, train_pt, 128, training=True)
-    val_loader = DataLoader(vocab_json, kb_pt, val_pt, args.batch_size)
+    val_loader = DataLoader(vocab_json, kb_pt, val_pt, 128)
     vocab = train_loader.vocab
 
     logging.info("Create model.........")
@@ -65,11 +66,12 @@ def train(args):
     logging.info(model)
 
     optimizer = optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[args.lr_decay_step], gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[5, 20], gamma=0.1)
     criterion = nn.CrossEntropyLoss().to(device)
 
     # validate(model, val_loader, device)
     meters = MetricLogger(delimiter="  ")
+    best_acc = 0
     logging.info("Start training........")
     for epoch in range(args.num_epoch):
         model.train()
@@ -99,16 +101,21 @@ def train(args):
                             "lr: {lr:.6f}",
                         ]
                     ).format(
-                        progress=epoch + iteration / len(train_loader),
+                        progress=epoch + iteration / len(_train_loader),
                         meters=str(meters),
                         lr=optimizer.param_groups[0]["lr"],
                     )
                 )
         
-        validate(model, val_loader, device)
+        if epoch == args.num_epoch-1 or (epoch+1)%2 == 0:
+            acc = validate(model, val_loader, device)
+        else:
+            acc = None
         scheduler.step()
-        if (epoch+1)%10 == 0:
-            torch.save(model.state_dict(), os.path.join(args.save_dir, 'model_{}.pt'.format(epoch)))
+        if acc and acc > best_acc:
+            best_acc = acc
+            logging.info("\nupdate best ckpt with acc: {:.4f}".format(best_acc))
+            torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
 
 
 
@@ -121,9 +128,8 @@ def main():
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
-    parser.add_argument('--lr_decay_step', default=5, type=int)
     parser.add_argument('--weight_decay', default=1e-5, type=float)
-    parser.add_argument('--num_epoch', default=20, type=int)
+    parser.add_argument('--num_epoch', default=40, type=int)
     parser.add_argument('--batch_size', default=6, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
     # model hyperparameters
@@ -135,9 +141,8 @@ def main():
     args = parser.parse_args()
 
     # make logging.info display into both shell and file
-    if os.path.isdir(args.save_dir):
-        shutil.rmtree(args.save_dir)
-    os.mkdir(args.save_dir)
+    if not os.path.exists(args.save_dir):
+        os.makedirs(args.save_dir)
     fileHandler = logging.FileHandler(os.path.join(args.save_dir, 'log.txt'))
     fileHandler.setFormatter(logFormatter)
     rootLogger.addHandler(fileHandler)

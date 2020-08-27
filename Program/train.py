@@ -28,7 +28,7 @@ def validate_executor(executor, data):
         answer = [data.vocab['answer_idx_to_token'][a.item()] for a in answer]
         preds = []
         for i in range(len(gt_program)):
-            pred = executor.forward(gt_program[i], gt_dep[i], gt_inputs[i], ignore_error=True)
+            pred = executor.forward(gt_program[i], gt_inputs[i], ignore_error=True)
             if pred == answer[i]:
                 correct += 1
             else:
@@ -36,6 +36,8 @@ def validate_executor(executor, data):
                 pred = executor.forward(gt_program[i], gt_dep[i], gt_inputs[i], ignore_error=True, show_details=True)
                 embed()
             count += 1
+        if count >= 10000:
+            break
     print('{}/{}/{:.4f}'.format(correct, count, correct/count))
 
 
@@ -51,19 +53,17 @@ def validate(model, data, device, executor=None):
     with torch.no_grad():
         for batch in tqdm(data, total=len(data)):
             question, choices, gt_program, gt_dep, gt_inputs, answer = [x.to(device) for x in batch]
-            pred_program, pred_dep, pred_inputs = model(question)
+            pred_program, pred_inputs = model(question)
 
-            gt_program, gt_dep, gt_inputs = [x.cpu().numpy() for x in (gt_program, gt_dep, gt_inputs)]
-            pred_program, pred_dep, pred_inputs = [x.cpu().numpy() for x in (pred_program, pred_dep, pred_inputs)]
+            gt_program, gt_inputs = [x.cpu().numpy() for x in (gt_program, gt_inputs)]
+            pred_program, pred_inputs = [x.cpu().numpy() for x in (pred_program, pred_inputs)]
 
             for i in range(len(gt_program)):
 
                 # print(gt_program[i])
-                # print(gt_dep[i])
                 # print(gt_inputs[i])
                 # print('---')
                 # print(pred_program[i])
-                # print(pred_dep[i])
                 # print(pred_inputs[i])
                 # print('==========')
 
@@ -77,31 +77,27 @@ def validate(model, data, device, executor=None):
                         break
                 if match:
                     match_prog_num += 1
-                    if np.all(gt_dep[i,1:l,:]==pred_dep[i,1:l,:]):
-                        match_dep_num += 1
                     if np.all(gt_inputs[i,1:l,:]==pred_inputs[i,1:l,:]):
                         match_inp_num += 1
-                    if np.all(gt_dep[i,1:l,:]==pred_dep[i,1:l,:]) and \
-                        np.all(gt_inputs[i,1:l,:]==pred_inputs[i,1:l,:]):
-                        match_all_num += 1
 
             count += len(gt_program)
 
             if executor:
                 answer = [data.vocab['answer_idx_to_token'][a.item()] for a in answer]
                 for i in range(len(gt_program)):
-                    pred = executor.forward(pred_program[i], pred_dep[i], pred_inputs[i], ignore_error=True)
+                    pred = executor.forward(pred_program[i], pred_inputs[i], ignore_error=True)
                     if pred == answer[i]:
                         correct += 1
 
-    logging.info('\nValid match program: {:.4f}, dependencies: {:.4f}, inputs: {:.4f}, all: {:.4f}\n'.format(
+    logging.info('\nValid match program: {:.4f}, inputs: {:.4f}\n'.format(
         match_prog_num / count,
-        match_dep_num / count,
         match_inp_num / count,
-        match_all_num / count
         ))
     if executor:
         logging.info('Accuracy: {:.4f}\n'.format(correct / count))
+        return correct / count
+    else:
+        return None
 
 
 def train(args):
@@ -120,7 +116,7 @@ def train(args):
     val_loader = DataLoader(vocab_json, val_pt, args.batch_size)
     vocab = train_loader.vocab
 
-    rule_executor = RuleExecutor(vocab, args.kb_json, args.sequential_input)
+    rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'), args.sequential_input)
 
     logging.info("Create model.........")
     model = Parser(vocab, args.dim_word, args.dim_hidden)
@@ -135,12 +131,15 @@ def train(args):
         model.load_state_dict(torch.load(args.ckpt, map_location={'cuda': 'cpu'}))
 
     optimizer = optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[args.lr_decay_step], gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[5, 50], gamma=0.1)
 
-    validate(model, val_loader, device)
+    # accuracy of val_loader is about 80% due to OOV issue
     # validate_executor(rule_executor, train_loader)
+    # return
+    validate(model, val_loader, device)
 
     meters = MetricLogger(delimiter="  ")
+    best_acc = 0
     logging.info("Start training........")
     for epoch in range(args.num_epoch):
         model.train()
@@ -148,7 +147,7 @@ def train(args):
             iteration = iteration + 1
 
             question, choices, program, prog_depends, prog_inputs, answer = [x.to(device) for x in batch]
-            loss = model(question, program, prog_depends, prog_inputs)
+            loss = model(question, program, prog_inputs)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -169,13 +168,15 @@ def train(args):
                     )
                 )
         
-        torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
         scheduler.step()
         if epoch == args.num_epoch-1 or (epoch+1)%5 == 0:
-            validate(model, val_loader, device, rule_executor)
+            acc = validate(model, val_loader, device, rule_executor)
         else:
-            validate(model, val_loader, device)
-
+            acc = validate(model, val_loader, device)
+        if acc and acc > best_acc:
+            best_acc = acc
+            logging.info("update best ckpt with acc: {:.4f}".format(best_acc))
+            torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
 
 
 def main():
@@ -183,15 +184,13 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--glove_pt', default='/data/csl/resources/word2vec/glove.840B.300d.py36.pt')
-    parser.add_argument('--kb_json')
+    parser.add_argument('--glove_pt', default='/data/sjx/glove.840B.300d.py36.pt')
     parser.add_argument('--ckpt')
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--weight_decay', default=1e-5, type=float)
-    parser.add_argument('--num_epoch', default=80, type=int)
-    parser.add_argument('--lr_decay_step', default=2, type=int)
+    parser.add_argument('--num_epoch', default=100, type=int)
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
     # model hyperparameters

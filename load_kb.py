@@ -302,3 +302,23 @@ class DataForSPARQL(object):
 
     def is_concept(self, ent_id):
         return ent_id in self.concepts
+
+    def get_attribute_facts(self, ent_id, key=None, unit=None):
+        if key:
+            facts = []
+            for attr_info in self.entities[ent_id]['attributes']:
+                if attr_info['key'] == key:
+                    if unit:
+                        if attr_info['value'].unit == unit:
+                            facts.append(attr_info)
+                    else:
+                        facts.append(attr_info)
+        else:
+            facts = self.entities[ent_id]['attributes']
+        facts = [(f['key'], f['value'], f['qualifiers']) for f in facts]
+        return facts
+
+    def get_relation_facts(self, ent_id):
+        facts = self.entities[ent_id]['relations']
+        facts = [(f['predicate'], f['object'], f['direction'], f['qualifiers']) for f in facts]
+        return facts

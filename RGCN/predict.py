@@ -27,10 +27,11 @@ def test(args):
         node_descs, triples, 
         args.dim_word, args.dim_hidden, args.dim_g)
     model = model.to(device)
-    model.load_state_dict(torch.load(args.ckpt))
+    model.eval()
+    model.load_state_dict(torch.load(os.path.join(args.save_dir, 'model.pt')))
     
-    fn_open = open(os.path.join(args.output_dir, 'test_predictions_open.txt'), 'w')
-    fn_choice = open(os.path.join(args.output_dir, 'test_predictions_choice.txt'), 'w')
+    fn_open = open(os.path.join(args.save_dir, 'predict.txt'), 'w')
+    fn_choice = open(os.path.join(args.save_dir, 'choice_predict.txt'), 'w')
     for batch in tqdm(data, total=len(data)):
         question, choices, answer = batch
         question = question.to(device)
@@ -57,8 +58,7 @@ def main():
     parser = argparse.ArgumentParser()
     # input and output
     parser.add_argument('--input_dir', required=True)
-    parser.add_argument('--ckpt', required=True, help='path of checkpoints')
-    parser.add_argument('--output_dir', required=True, help='path to store predictions')
+    parser.add_argument('--save_dir', required=True, help='path to store predictions')
 
     # model hyperparameters
     parser.add_argument('--dim_word', default=300, type=int)

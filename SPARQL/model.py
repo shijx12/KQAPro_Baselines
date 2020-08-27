@@ -25,6 +25,7 @@ class SPARQLParser(nn.Module):
                 nn.ReLU(),
                 nn.Linear(1024, num_sparql),
             )
+
         self.att_lin = nn.Linear(dim_hidden, dim_hidden)
 
         for m in self.modules():
@@ -70,6 +71,7 @@ class SPARQLParser(nn.Module):
         criterion = nn.CrossEntropyLoss().to(device)
         logit = self.sparql_classifier(s_word_h) # [bsz, max_s, num_sparql]
         loss = criterion(logit.permute(0, 2, 1)[:,:,:-1], sparqls[:,1:]) # remember to shift the gt
+
         return loss
 
 
@@ -108,4 +110,5 @@ class SPARQLParser(nn.Module):
                 break
 
         sparqls = torch.stack(sparqls, dim=1) # [bsz, max_s]
+
         return sparqls

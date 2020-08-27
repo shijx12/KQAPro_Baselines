@@ -16,7 +16,7 @@ def collate(batch):
     question = torch.stack(batch[0])
     choices = torch.stack(batch[1])
     if batch[-1][0] is None:
-        program, prog_depends, prog_inputs, answer = None, None, None, None, None
+        program, prog_depends, prog_inputs, answer = None, None, None, None
     else:
         program, prog_depends, prog_inputs = list(map(torch.stack, batch[2:5]))
         answer = torch.cat(batch[5])
@@ -43,6 +43,7 @@ class Dataset(torch.utils.data.Dataset):
             prog_depends = torch.LongTensor(self.func_depends[index])
             prog_inputs = torch.LongTensor(self.func_inputs[index])
             answer = torch.LongTensor([self.answers[index]])
+        # dependency is not necessary because it can be inferred based on functions
         return question, choices, program, prog_depends, prog_inputs, answer
 
 

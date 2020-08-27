@@ -8,11 +8,12 @@ import json
 from tqdm import tqdm
 
 from utils import MetricLogger
+from evaluate import whether_equal
 from load_kb import DataForSPARQL
 from .data import DataLoader
 from .model import SPARQLParser
-from .sparql_engine import check_sparql
-from .preprocess import remove_space
+from .sparql_engine import get_sparql_answer
+from .preprocess import postprocess_sparql_tokens
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
@@ -24,46 +25,39 @@ warnings.simplefilter("ignore") # hide warnings that caused by invalid sparql qu
 from IPython import embed
 
 
-def validate(args, model, data, device):
-    kb = DataForSPARQL(args.kb_path)
-    raw_val_data = json.load(open(args.val_path))
-
+def validate(args, kb, model, data, device):
     model.eval()
     count, correct = 0, 0
-    idx = 0
     with torch.no_grad():
         for batch in tqdm(data, total=len(data)):
             question, choices, sparql, answer = [x.to(device) for x in batch]
             pred_sparql = model(question)
 
-            answer = answer.cpu().numpy().tolist()
-            pred_sparql = pred_sparql.cpu().numpy().tolist()
+            answer, pred_sparql = [x.cpu().numpy().tolist() for x in (answer, pred_sparql)]
             for a, s in zip(answer, pred_sparql):
                 given_answer = data.vocab['answer_idx_to_token'][a]
-                program = raw_val_data[idx]['program'] # dataloader should not shuffle
-                idx += 1
                 s = [data.vocab['sparql_idx_to_token'][i] for i in s]
                 end_idx = len(s)
                 if '<END>' in s:
                     end_idx = s.index('<END>')
                 s = ' '.join(s[1:end_idx])
-                s = remove_space(s)
-                is_match = check_sparql(s, given_answer, program, kb)
+                s = postprocess_sparql_tokens(s)
+                pred_answer = get_sparql_answer(s, kb)
+                is_match = whether_equal(given_answer, pred_answer)
                 if is_match:
                     correct += 1
             count += len(answer)
     acc = correct / count
     logging.info('\nValid Accuracy: %.4f\n' % acc)
+    return acc
 
 def test_sparql(args):
     vocab_json = os.path.join(args.input_dir, 'vocab.json')
     train_pt = os.path.join(args.input_dir, 'train.pt')
     data = DataLoader(vocab_json, train_pt, args.batch_size, training=False)
-    kb = DataForSPARQL(args.kb_path)
-    raw_val_data = json.load(open('./test_dataset/train.json'))
+    kb = DataForSPARQL(os.path.join(args.input_dir, 'kb.json'))
 
     count, correct = 0, 0
-    idx = 0
     for batch in tqdm(data, total=len(data)):
         question, choices, sparql, answer = batch
         pred_sparql = sparql
@@ -72,21 +66,19 @@ def test_sparql(args):
         pred_sparql = pred_sparql.cpu().numpy().tolist()
         for a, s in zip(answer, pred_sparql):
             given_answer = data.vocab['answer_idx_to_token'][a]
-            program = raw_val_data[idx]['program'] # dataloader should not shuffle
-            idx += 1
             s = [data.vocab['sparql_idx_to_token'][i] for i in s]
             end_idx = len(s)
             if '<END>' in s:
                 end_idx = s.index('<END>')
             s = ' '.join(s[1:end_idx])
-            s = remove_space(s)
-            is_match = check_sparql(s, given_answer, program, kb)
+            s = postprocess_sparql_tokens(s)
+            pred_answer = get_sparql_answer(s, kb)
+            is_match = whether_equal(given_answer, pred_answer)
+            count += 1
             if is_match:
                 correct += 1
-                print(correct, idx)
             else:
-                print(s)
-                print(raw_val_data[idx-1]['sparql'])
+                print(given_answer, pred_answer)
 
 def train(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -98,6 +90,7 @@ def train(args):
     train_loader = DataLoader(vocab_json, train_pt, args.batch_size, training=True)
     val_loader = DataLoader(vocab_json, val_pt, args.batch_size)
     vocab = train_loader.vocab
+    kb = DataForSPARQL(os.path.join(args.input_dir, 'kb.json'))
 
     logging.info("Create model.........")
     model = SPARQLParser(vocab, args.dim_word, args.dim_hidden, args.max_dec_len)
@@ -105,10 +98,11 @@ def train(args):
     logging.info(model)
 
     optimizer = optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[args.lr_decay_step], gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[5, 50], gamma=0.1)
 
-    validate(args, model, val_loader, device)
+    # validate(args, kb, model, val_loader, device)
     meters = MetricLogger(delimiter="  ")
+    best_acc = 0
     logging.info("Start training........")
     for epoch in range(args.num_epoch):
         model.train()
@@ -137,10 +131,12 @@ def train(args):
                     )
                 )
         
-        validate(args, model, val_loader, device)
+        acc = validate(args, kb, model, val_loader, device)
         scheduler.step()
-        if (epoch+1)%10 == 0:
-            torch.save(model.state_dict(), os.path.join(args.save_dir, 'model_{}.pt'.format(epoch)))
+        if acc and acc > best_acc:
+            best_acc = acc
+            logging.info("\nupdate best ckpt with acc: {:.4f}".format(best_acc))
+            torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
 
 
 def main():
@@ -148,12 +144,9 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--kb_path', required=True)
-    parser.add_argument('--val_path', required=True)
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
-    parser.add_argument('--lr_decay_step', default=5, type=int)
     parser.add_argument('--weight_decay', default=1e-5, type=float)
     parser.add_argument('--num_epoch', default=100, type=int)
     parser.add_argument('--batch_size', default=64, type=int)

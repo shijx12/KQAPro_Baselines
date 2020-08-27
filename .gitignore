@@ -1,6 +1,7 @@
 *.sublime-workspace
 *.sublime-project
 test_dataset/
+dataset/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

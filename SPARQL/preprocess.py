@@ -1,3 +1,7 @@
+"""
+We need the last function to help extract the final answer of SPARQL, used in check_sparql
+"""
+
 import os
 import json
 import pickle
@@ -11,7 +15,6 @@ import re
 
 from utils import init_vocab
 
-
 def tokenize_sparql(s): 
     # separate punctuations
     s = s.replace('"', ' " ').replace('^^', ' ^^ ')
@@ -19,7 +22,8 @@ def tokenize_sparql(s):
     # this may cause some mistakes, but the ratio is very small, about one of thousands
     return s.split()
 
-def remove_space(s):
+def postprocess_sparql_tokens(s):
+    # organize the predicted sparql tokens into a valid query
     s = s.replace(' ^^ ', '^^')
     skip_idxs = set()
     for i in range(len(s)):
@@ -107,6 +111,7 @@ def main():
         for a in tokenize_sparql(question['sparql']):
             if a not in vocab['sparql_token_to_idx']:
                 vocab['sparql_token_to_idx'][a] = len(vocab['sparql_token_to_idx'])
+
     # filter low-frequency words
     for w, c in word_counter.items():
         if w and c >= args.min_cnt and w not in vocab['word_token_to_idx']:
@@ -130,6 +135,7 @@ def main():
     for name, dataset in zip(('train', 'val', 'test'), (train_set, val_set, test_set)):
         print('Encode {} set'.format(name))
         outputs = encode_dataset(dataset, vocab, name=='test')
+        assert len(outputs) == 4
         print('shape of questions, sparqls, choices, answers:')
         with open(os.path.join(args.output_dir, '{}.pt'.format(name)), 'wb') as f:
             for o in outputs:

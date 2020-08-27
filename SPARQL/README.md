@@ -75,9 +75,14 @@ and get `<results/kg.ttl>`
 3. modify `virtuoso_address` and `virtuoso_graph_uri` in `sparql_engine.py` to make them point to your virtuoso service
 4. preprocess the training data
 ```
-python -m SPARQL.preprocess --input_dir ./test_dataset --output_dir /data/sjx/exp/KBQA/SPARQL
+python -m SPARQL.preprocess --input_dir ./dataset --output_dir /data/sjx/exp/KBQA/SPARQL
+cp ./dataset/kb.json /data/sjx/exp/KBQA/SPARQL
 ```
 5. sparql engine has been prepared well, now you can run `train.py` with following command
 ```
-CUDA_VISIBLE_DEVICES=7 python -m SPARQL.train --input_dir /data/sjx/exp/KBQA/SPARQL --save_dir /data/sjx/exp/KBQA/SPARQL/debug --kb_path /data/sjx/dataset/KQApro/release/kb.json --val_path /data/sjx/dataset/KQApro/release/val.json
+CUDA_VISIBLE_DEVICES=0 python -m SPARQL.train --input_dir /data/sjx/exp/KBQA/SPARQL --save_dir /data/sjx/exp/KBQA/SPARQL/debug
+```
+6. predict answer for test set
+```
+CUDA_VISIBLE_DEVICES=2 python -m SPARQL.predict --input_dir /data/sjx/exp/KBQA/SPARQL --save_dir /data/sjx/exp/KBQA/SPARQL/debug
 ```

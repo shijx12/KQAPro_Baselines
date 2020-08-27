@@ -154,7 +154,7 @@ class RuleExecutor(object):
         return ancestors
 
 
-    def forward(self, program, dependency, inputs, 
+    def forward(self, program, inputs, 
                 ignore_error=False, show_details=False):
         memory = []
         program = [self.vocab['function_idx_to_token'][p] for p in program]
@@ -176,6 +176,22 @@ class RuleExecutor(object):
             inputs = [[self.vocab['word_idx_to_token'][i] for i in inp] for inp in inputs]
 
         try:
+            # infer the dependency based on the function definition
+            dependency = []
+            branch_stack = []
+            for i, p in enumerate(program):
+                if p in {'<START>', '<END>', '<PAD>'}:
+                    dep = [0, 0]
+                elif p in {'FindAll', 'Find'}:
+                    dep = [0, 0]
+                    branch_stack.append(i - 1)
+                elif p in {'And', 'Or', 'SelectBetween', 'QueryRelation', 'QueryRelationQualifier'}:
+                    dep = [branch_stack[-1], i-1]
+                    branch_stack = branch_stack[:-1]
+                else:
+                    dep = [i-1, 0]
+                dependency.append(dep)
+
             for p, dep, inp in zip(program, dependency, inputs):
                 if p == '<START>':
                     res = None

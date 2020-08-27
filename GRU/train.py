@@ -23,7 +23,7 @@ def validate(model, data, device):
     count, correct = 0, 0
     with torch.no_grad():
         for batch in tqdm(data, total=len(data)):
-            question, choices, program, prog_depends, prog_inputs, sparql, answer = [x.to(device) for x in batch]
+            question, choices, answer = [x.to(device) for x in batch]
             logit = model(question)
             predict = logit.max(1)[1]
             correct += torch.eq(predict, answer).long().sum().item()
@@ -31,6 +31,7 @@ def validate(model, data, device):
 
     acc = correct / count
     logging.info('\nValid Accuracy: %.4f\n' % acc)
+    return acc
 
 
 def train(args):
@@ -54,18 +55,19 @@ def train(args):
     logging.info(model)
 
     optimizer = optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[3], gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[5, 50], gamma=0.1)
     criterion = nn.CrossEntropyLoss().to(device)
 
     validate(model, val_loader, device)
     meters = MetricLogger(delimiter="  ")
+    best_acc = 0
     logging.info("Start training........")
     for epoch in range(args.num_epoch):
         model.train()
         for iteration, batch in enumerate(train_loader):
             iteration = iteration + 1
 
-            question, choices, program, prog_depends, prog_inputs, sparql, answer = [x.to(device) for x in batch]
+            question, choices, answer = [x.to(device) for x in batch]
             logits = model(question)
             loss = criterion(logits, answer)
             optimizer.zero_grad()
@@ -88,9 +90,12 @@ def train(args):
                     )
                 )
         
-        validate(model, val_loader, device)
-        torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
+        acc = validate(model, val_loader, device)
         scheduler.step()
+        if acc and acc > best_acc:
+            best_acc = acc
+            logging.info("\nupdate best ckpt with acc: {:.4f}".format(best_acc))
+            torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
 
 
 def main():
@@ -98,14 +103,15 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
+    parser.add_argument('--glove_pt', default='/data/sjx/glove.840B.300d.py36.pt')
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--weight_decay', default=1e-5, type=float)
-    parser.add_argument('--num_epoch', default=10, type=int)
-    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--num_epoch', default=100, type=int)
+    parser.add_argument('--batch_size', default=128, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
-    parser.add_argument('--glove_pt', default='/data/csl/resources/word2vec/glove.840B.300d.py36.pt')
+
     # model hyperparameters
     parser.add_argument('--dim_word', default=300, type=int)
     parser.add_argument('--dim_hidden', default=1024, type=int)
