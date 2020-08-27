@@ -9,7 +9,7 @@ def load_vocab(path):
     vocab['id2word'] = invert_dict(vocab['word2id'])
     vocab['id2entity'] = invert_dict(vocab['entity2id'])
     vocab['id2relation'] = invert_dict(vocab['relation2id'])
-    vocab['entity2name'] = invert_dict(vocab['name2entity'])
+    # vocab['entity2name'] = invert_dict(vocab['name2entity'])
     return vocab
 
 def collate(batch):
