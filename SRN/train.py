@@ -9,7 +9,7 @@ from tqdm import tqdm
 from utils import MetricLogger, load_glove
 from SRN.data import DataLoader
 from SRN.model import SRN
-
+import copy
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
@@ -33,7 +33,7 @@ def validate(model, data, device):
             correct += torch.any(pred_top_e2 == answers, dim=1).float().sum().item()
             count += len(answers)
     acc = correct / count
-    logging.info('\nValid Accuracy: %.4f\n' % acc)
+    logging.info('\nValid Accuracy: %.4f' % acc)
     return acc
 
 def train(args):
@@ -72,6 +72,9 @@ def train(args):
     validate(model, test_loader, device)
     meters = MetricLogger(delimiter="  ")
     logging.info("Start training........")
+    best_model= copy.deepcopy(model.state_dict())
+    best_acc = 0.0
+    eps = 0.00001
     for epoch in range(args.num_epoch):
         model.train()
         for iteration, batch in enumerate(train_loader):
@@ -98,10 +101,27 @@ def train(args):
                         lr=optimizer.param_groups[0]["lr"],
                     )
                 )
+            # break
         
-        validate(model, val_loader, device)
-        acc = validate(model, test_loader, device)
-        torch.save(model.state_dict(), os.path.join(args.save_dir, '%s-%s-%d-%.2f'%(args.model_name, args.opt, args.lr, acc)))
+        acc = validate(model, val_loader, device)
+        if acc > best_acc + eps:
+            best_acc = acc
+            no_update = 0
+            best_model = copy.deepcopy(model.state_dict())
+            logging.info("Validation accuracy increased from previous epoch {}".format(acc))
+            acc = validate(model, test_loader, device)
+            logging.info('Test score for best valid so far: {}'.format(acc))
+            torch.save(model.state_dict(), os.path.join(args.save_dir, '%s-%s-%s-%s.pt'%(args.opt, str(args.lr), str(args.bandwidth), str(epoch))))
+        elif (acc < best_acc + eps) and (no_update < args.patience):
+            no_update +=1
+            logging.info("Validation accuracy decreases to %f from %f, %d more epoch to check"%(acc, best_acc, args.patience-no_update))
+        elif no_update == args.patience:
+            logging.info("Model has exceed patience. Saving best model and exiting")
+            torch.save(best_model, os.path.join(args.save_dir, "best_score_model.pt"))
+            exit()
+
+        # acc = validate(model, test_loader, device)
+        # torch.save(model.state_dict(), os.path.join(args.save_dir, '%s-%s-%d-%.2f'%(args.model_name, args.opt, args.lr, acc)))
         # scheduler.step()
 
 
@@ -115,8 +135,8 @@ def main():
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--weight_decay', default=1e-5, type=float)
-    parser.add_argument('--num_epoch', default=60, type=int)
-    parser.add_argument('--batch_size', default=512, type=int)
+    parser.add_argument('--num_epoch', default=100, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
     # model hyperparameters
     parser.add_argument('--dim_emb', default=300, type=int)
@@ -126,7 +146,7 @@ def main():
     parser.add_argument('--dim_hidden', default=300, type=int)
     parser.add_argument('--bucket_interval', default = 3, type = int)
     parser.add_argument('--opt', default = 'adam', type = str)
-    parser.add_argument('--bandwidth', default = 100, type = int)
+    parser.add_argument('--bandwidth', default = 50, type = int)
     parser.add_argument('--gamma', default = 0.95, type = float)
     parser.add_argument('--eta', default = 0.95, type = float)
     parser.add_argument('--beta', default = 0, type =float)
@@ -134,6 +154,7 @@ def main():
     parser.add_argument('--log_name', default = 'log.txt', type = str)
     parser.add_argument('--model_name', default = 'model.pt', type = str)
     parser.add_argument('--rel', action = 'store_true')
+    parser.add_argument('--patience', default = 10, type = int)
     args = parser.parse_args()
 
     # make logging.info display into both shell and file
