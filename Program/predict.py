@@ -5,24 +5,19 @@ import shutil
 from tqdm import tqdm
 import numpy as np
 
-from Program.data import DataLoader
-from Program.executor_rule import RuleExecutor
+from .data import DataLoader
+from .parser import Parser
+from .executor_rule import RuleExecutor
 
 def main():
     parser = argparse.ArgumentParser()
     # input and output
     parser.add_argument('--input_dir', required=True)
-    parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
+    parser.add_argument('--save_dir', required=True, help='path of checkpoint')
     # model hyperparameters
-    parser.add_argument('--sequential_input', action='store_true')
     parser.add_argument('--dim_word', default=300, type=int)
     parser.add_argument('--dim_hidden', default=1024, type=int)
     args = parser.parse_args()
-
-    if args.sequential_input:
-        from Program.sequential_input.parser import Parser
-    else:
-        from Program.token_input.parser import Parser
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     vocab_json = os.path.join(args.input_dir, 'vocab.json')
@@ -30,7 +25,7 @@ def main():
     test_loader = DataLoader(vocab_json, test_pt, 128)
     vocab = test_loader.vocab
 
-    rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'), args.sequential_input)
+    rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'))
     model = Parser(vocab, args.dim_word, args.dim_hidden)
 
     print("load ckpt from {}".format(args.save_dir))
@@ -38,7 +33,6 @@ def main():
         torch.load(os.path.join(args.save_dir, 'model.pt'), map_location={'cuda': 'cpu'}))
     model = model.to(device)
     model.eval() 
-
 
     with open(os.path.join(args.save_dir, 'predict.txt'), 'w') as f:
         with torch.no_grad():

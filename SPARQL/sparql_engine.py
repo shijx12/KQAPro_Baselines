@@ -4,8 +4,9 @@ from rdflib.plugins.stores import sparqlstore
 from itertools import chain
 from tqdm import tqdm
 import argparse
-from load_kb import DataForSPARQL
-from value_class import ValueClass
+
+from utils.load_kb import DataForSPARQL
+from utils.value_class import ValueClass
 
 
 virtuoso_address = "http://127.0.0.1:8890/sparql"

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.nn.pytorch import RelGraphConv
 
-from models.BiGRU import BiGRU
+from utils.BiGRU import BiGRU
 
 class RGCN(nn.Module):
     def __init__(self, in_dim, h_dim, out_dim, num_rels, num_bases,

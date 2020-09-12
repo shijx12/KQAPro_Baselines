@@ -6,16 +6,14 @@ import argparse
 import shutil
 from tqdm import tqdm
 
-from utils import MetricLogger, load_glove
-from KVMemNN.data import DataLoader
-from KVMemNN.model import KVMemNN
+from utils.misc import MetricLogger, load_glove
+from .data import DataLoader
+from .model import KVMemNN
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
-
-from IPython import embed
 
 torch.set_num_threads(1) # avoid using multiple cpus
 
@@ -109,7 +107,7 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--glove_pt', default='/data/sjx/glove.840B.300d.py36.pt')
+    parser.add_argument('--glove_pt', required=True)
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)

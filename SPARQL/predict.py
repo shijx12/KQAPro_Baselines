@@ -4,7 +4,7 @@ import argparse
 import json
 from tqdm import tqdm
 
-from load_kb import DataForSPARQL
+from utils.load_kb import DataForSPARQL
 from .data import DataLoader
 from .model import SPARQLParser
 from .sparql_engine import get_sparql_answer

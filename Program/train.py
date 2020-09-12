@@ -7,19 +7,19 @@ import shutil
 from tqdm import tqdm
 import numpy as np
 
-from utils import MetricLogger, load_glove
-from Program.data import DataLoader
-from Program.executor_rule import RuleExecutor
+from utils.misc import MetricLogger, load_glove
+from .data import DataLoader
+from .parser import Parser
+from .executor_rule import RuleExecutor
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
 
-from IPython import embed
-
 
 def validate_executor(executor, data):
+    # validate whether the executor is correct
     correct = 0
     count = 0
     for batch in tqdm(data, total=len(data)):
@@ -101,11 +101,6 @@ def validate(model, data, device, executor=None):
 
 
 def train(args):
-    if args.sequential_input:
-        from Program.sequential_input.parser import Parser
-    else:
-        from Program.token_input.parser import Parser
-
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     logging.info("Create train_loader and val_loader.........")
@@ -116,7 +111,7 @@ def train(args):
     val_loader = DataLoader(vocab_json, val_pt, args.batch_size)
     vocab = train_loader.vocab
 
-    rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'), args.sequential_input)
+    rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'))
 
     logging.info("Create model.........")
     model = Parser(vocab, args.dim_word, args.dim_hidden)
@@ -133,9 +128,7 @@ def train(args):
     optimizer = optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[5, 50], gamma=0.1)
 
-    # accuracy of val_loader is about 80% due to OOV issue
-    # validate_executor(rule_executor, train_loader)
-    # return
+    # validate_executor(rule_executor, train_loader) # accuracy of val_loader is about 80% due to OOV issue
     validate(model, val_loader, device)
 
     meters = MetricLogger(delimiter="  ")
@@ -175,7 +168,7 @@ def train(args):
             acc = validate(model, val_loader, device)
         if acc and acc > best_acc:
             best_acc = acc
-            logging.info("update best ckpt with acc: {:.4f}".format(best_acc))
+            logging.info("\nupdate best ckpt with acc: {:.4f}".format(best_acc))
             torch.save(model.state_dict(), os.path.join(args.save_dir, 'model.pt'))
 
 
@@ -184,7 +177,7 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--glove_pt', default='/data/sjx/glove.840B.300d.py36.pt')
+    parser.add_argument('--glove_pt', required=True)
     parser.add_argument('--ckpt')
 
     # training parameters
@@ -194,7 +187,6 @@ def main():
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--seed', type=int, default=666, help='random seed')
     # model hyperparameters
-    parser.add_argument('--sequential_input', action='store_true')
     parser.add_argument('--dim_word', default=300, type=int)
     parser.add_argument('--dim_hidden', default=1024, type=int)
     args = parser.parse_args()

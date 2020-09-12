@@ -6,15 +6,15 @@ import argparse
 import shutil
 from tqdm import tqdm
 
-from KVMemNN.data import DataLoader
-from KVMemNN.model import KVMemNN
+from .data import DataLoader
+from .model import KVMemNN
 
 
 def main():
     parser = argparse.ArgumentParser()
     # input and output
     parser.add_argument('--input_dir', required=True)
-    parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
+    parser.add_argument('--save_dir', required=True, help='path of checkpoint')
 
     # model hyperparameters
     parser.add_argument('--dim_emb', default=300, type=int)
@@ -45,7 +45,7 @@ def main():
             f.write(vocab['answer_idx_to_token'][i] + '\n')
 
     f1 = open(os.path.join(args.save_dir, 'predict.txt'), 'w')
-    f2 = open(os.path.join(args.save_dir, 'choiced_predict.txt'), 'w')
+    f2 = open(os.path.join(args.save_dir, 'choice_predict.txt'), 'w')
     with torch.no_grad():
         for batch in tqdm(test_loader, total=len(test_loader)):
             question, choices, keys, values = [x.to(device) for x in batch[:4]]

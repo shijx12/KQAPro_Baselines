@@ -6,10 +6,10 @@ import argparse
 import shutil
 import json
 from tqdm import tqdm
+from datetime import date
 
-from utils import MetricLogger
-from evaluate import whether_equal
-from load_kb import DataForSPARQL
+from utils.misc import MetricLogger
+from utils.load_kb import DataForSPARQL
 from .data import DataLoader
 from .model import SPARQLParser
 from .sparql_engine import get_sparql_answer
@@ -22,7 +22,53 @@ rootLogger = logging.getLogger()
 import warnings
 warnings.simplefilter("ignore") # hide warnings that caused by invalid sparql query
 
-from IPython import embed
+def whether_equal(answer, pred):
+    """
+    check whether the two arguments are equal as attribute value
+    """
+    def truncate_float(x):
+        # convert answer from '100.0 meters' to '100 meters'
+        try:
+            v, *u = x.split()
+            v = float(v)
+            if v - int(v) < 1e-5:
+                v = int(v)
+            if len(u) == 0:
+                x = str(v)
+            else:
+                x = '{} {}'.format(str(v), ' '.join(u))
+        except:
+            pass
+        return x
+
+    def equal_as_date(x, y):
+        # check whether x and y are equal as type of date or year
+        try:
+            x_split = x.split('-')
+            y_split = y.split('-')
+            if len(x_split) == 3:
+                x = date(int(x_split[0]), int(x_split[1]), int(x_split[2]))
+            else:
+                x = int(x)
+            if len(y_split) == 3:
+                y = date(int(y_split[0]), int(y_split[1]), int(y_split[2]))
+            else:
+                y = int(y)
+            if isinstance(x, date) and isinstance(y, date):
+                return x == y
+            else:
+                x = x.year if isinstance(x, date) else x
+                y = y.year if isinstance(y, date) else y
+                return x == y
+        except:
+            return False
+
+    answer = truncate_float(answer)
+    pred = truncate_float(pred)
+    if equal_as_date(answer, pred):
+        return True
+    else:
+        return answer == pred
 
 
 def validate(args, kb, model, data, device):
@@ -52,6 +98,7 @@ def validate(args, kb, model, data, device):
     return acc
 
 def test_sparql(args):
+    # check whether the SPARQL engine is correct, with the training set
     vocab_json = os.path.join(args.input_dir, 'vocab.json')
     train_pt = os.path.join(args.input_dir, 'train.pt')
     data = DataLoader(vocab_json, train_pt, args.batch_size, training=False)

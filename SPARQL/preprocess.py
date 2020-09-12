@@ -13,7 +13,7 @@ from itertools import chain
 from tqdm import tqdm
 import re
 
-from utils import init_vocab
+from utils.misc import init_vocab
 
 def tokenize_sparql(s): 
     # separate punctuations

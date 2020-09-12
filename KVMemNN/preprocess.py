@@ -8,8 +8,8 @@ from collections import Counter, defaultdict
 from itertools import chain
 from tqdm import tqdm
 
-from load_kb import load_as_key_value
-from utils import init_vocab
+from utils.load_kb import load_as_key_value
+from utils.misc import init_vocab
 
 
 def create_inverted(keys):

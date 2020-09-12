@@ -8,8 +8,8 @@ from itertools import chain
 from tqdm import tqdm
 import argparse
 
-from load_kb import load_as_graph
-from utils import init_vocab
+from utils.load_kb import load_as_graph
+from utils.misc import init_vocab
 
 
 def encode_dataset(dataset, vocab):

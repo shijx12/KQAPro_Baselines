@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from models.BiGRU import BiGRU, GRU
+from utils.BiGRU import BiGRU, GRU
 
 class KVMemNN(nn.Module):
     def __init__(self, num_hop, dim_emb, vocab):

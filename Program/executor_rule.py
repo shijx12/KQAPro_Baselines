@@ -1,13 +1,14 @@
-from value_class import ValueClass, comp
+from utils.value_class import ValueClass, comp
 import json
 from collections import defaultdict
 from datetime import date
 from queue import Queue
 
 """
-All locating functions (including And Or) return (entity_ids, facts), even though some of them do not concern about facts.
-This is for visiting function results consistently, 
-i.e., using `entity_ids, _ = dependencies[0]`
+For convenience of implementation, in this rule-based execution engine,
+all locating functions (including And Or) return (entity_ids, facts), 
+even though some of them do not concern facts.
+So that we can always use `entity_ids, _ = dependencies[0]` to store outputs.
 """
 constrains = {                          # dependencies, inputs, returns, function
     # functions for locating entities
@@ -46,9 +47,8 @@ constrains = {                          # dependencies, inputs, returns, functio
 
 
 class RuleExecutor(object):
-    def __init__(self, vocab, kb_json, sequential_input=False):
+    def __init__(self, vocab, kb_json):
         self.vocab = vocab
-        self.sequential_input = sequential_input
         print('load kb')
         kb = json.load(open(kb_json))
         self.concepts = kb['concepts']
@@ -158,22 +158,7 @@ class RuleExecutor(object):
                 ignore_error=False, show_details=False):
         memory = []
         program = [self.vocab['function_idx_to_token'][p] for p in program]
-        
-        if self.sequential_input:
-            idx_inputs = inputs
-            inputs = [['' for i in inp] for inp in inputs]
-            for i in range(len(idx_inputs)):
-                for j in range(len(idx_inputs[0])):
-                    end_id = self.vocab['word_token_to_idx']['<END>']
-                    if end_id in idx_inputs[i][j]:
-                        end_idx = idx_inputs[i][j].tolist().index(end_id)
-                    else:
-                        end_idx = len(idx_inputs[i][j])
-                    start_idx = 1
-                    tokens = idx_inputs[i][j][start_idx: end_idx]
-                    inputs[i][j] = ' '.join([self.vocab['word_idx_to_token'][w] for w in tokens])
-        else:
-            inputs = [[self.vocab['word_idx_to_token'][i] for i in inp] for inp in inputs]
+        inputs = [[self.vocab['word_idx_to_token'][i] for i in inp] for inp in inputs]
 
         try:
             # infer the dependency based on the function definition

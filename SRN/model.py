@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-from models.BiGRU import GRU, BiGRU
+from utils.BiGRU import GRU, BiGRU
 from SRN.knowledge_graph import KnowledgeGraph
-from utils import *
+from utils.misc import *
 
 class SRN(nn.Module):
     def __init__(self, args, dim_word, dim_hidden, vocab):

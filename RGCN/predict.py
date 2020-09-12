@@ -4,8 +4,8 @@ import argparse
 import json
 from tqdm import tqdm
 
-from RGCN.data import DataLoader
-from RGCN.model import QuesAnsByRGCN
+from .data import DataLoader
+from .model import QuesAnsByRGCN
 
 
 def test(args):

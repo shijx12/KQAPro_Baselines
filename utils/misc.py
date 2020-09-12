@@ -4,6 +4,10 @@ import json
 import pickle
 import numpy as np
 import torch.nn as nn
+
+
+######################################################
+##################### used in SRN ####################
 START_RELATION = 'START_RELATION'
 NO_OP_RELATION = 'NO_OP_RELATION'
 NO_OP_ENTITY = 'NO_OP_ENTITY'
@@ -97,6 +101,10 @@ def tile_along_beam(v, beam_size, dim=0):
         else:
             new_size.append(d)
     return v.view(new_size)
+##################### used in SRN ####################
+######################################################
+
+
         
 def init_vocab():
     return {

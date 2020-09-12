@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from models.BiGRU import BiGRU
+from utils.BiGRU import BiGRU
 
 class GRUClassifier(nn.Module):
     def __init__(self, vocab, dim_word, dim_hidden):

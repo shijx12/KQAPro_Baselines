@@ -6,7 +6,7 @@ import argparse
 import shutil
 from tqdm import tqdm
 
-from utils import MetricLogger, load_glove
+from utils.misc import MetricLogger, load_glove
 from SRN.data import DataLoader
 from SRN.model import SRN
 
@@ -14,8 +14,6 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
-
-from IPython import embed
 
 torch.set_num_threads(1) # avoid using multiple cpus
 

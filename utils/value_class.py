@@ -1,5 +1,3 @@
-
-
 def comp(a, b, op):
     """
     Args:

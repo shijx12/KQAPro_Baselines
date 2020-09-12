@@ -9,16 +9,14 @@ import pickle
 import argparse
 import shutil
 
-from utils import MetricLogger, load_glove
-from RGCN.data import DataLoader
-from RGCN.model import QuesAnsByRGCN
+from utils.misc import MetricLogger, load_glove
+from .data import DataLoader
+from .model import QuesAnsByRGCN
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
-
-from IPython import embed
 
 
 def validate(model, data, device):
@@ -124,7 +122,7 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--glove_pt', default='/data/sjx/glove.840B.300d.py36.pt')
+    parser.add_argument('--glove_pt', required=True)
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)

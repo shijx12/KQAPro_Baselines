@@ -7,7 +7,7 @@ import collections
 from collections import Counter, defaultdict
 from itertools import chain
 from tqdm import tqdm
-from utils import *
+from utils.misc import *
 import re
 import os
 

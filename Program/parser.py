@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-from models.BiGRU import GRU, BiGRU
+from utils.BiGRU import GRU, BiGRU
 
 class Parser(nn.Module):
-    def __init__(self, vocab, dim_word, dim_hidden, max_dec_len=20, max_dep=2, max_inp=3, max_inp_len=12):
+    def __init__(self, vocab, dim_word, dim_hidden, max_dec_len=20, max_inp=3):
         super().__init__()
         num_func = len(vocab['function_token_to_idx'])
         num_words = len(vocab['word_token_to_idx'])
