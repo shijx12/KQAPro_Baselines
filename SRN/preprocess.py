@@ -154,7 +154,7 @@ def get_kbqa(args):
     train = json.load(open(os.path.join(args.input_dir, 'train.json')))
     with open(os.path.join(args.output_dir, 'qa_train.txt'), 'w') as f:
         for item in tqdm(train):
-            question = item['rewrite']
+            question = item['question']
             if '[' in question or ']' in question:
                 question = question.replace('[', '').replace(']', '')
             answer = item['answer']
@@ -165,25 +165,11 @@ def get_kbqa(args):
                     question = question.replace(topic_entity, 'e_s')
                 f.write('\t'.join([question, topic_entity, answer]) + '\n')
 
-    test = json.load(open(os.path.join(args.input_dir, 'test.json')))
-    with open(os.path.join(args.output_dir, 'qa_test.txt'), 'w') as f:
-        for item in tqdm(test):
-            question = item['rewrite']
-            if '[' in question or ']' in question:
-                question = question.replace('[', '').replace(']', '')
-            answer = item['answer']
-            program = item['program']
-            # if program[0]['function'] == 'Find' and len(program[0]['inputs']) == 1 and program[0]['inputs'][0] in entities and answer in entities:
-            if check(program, answer):
-                topic_entity = program[0]['inputs'][0]
-                if args.replace_es:
-                    question = question.replace(topic_entity, 'e_s')
-                f.write('\t'.join([question, topic_entity, answer]) + '\n')
         
     valid = json.load(open(os.path.join(args.input_dir, 'val.json')))
     with open(os.path.join(args.output_dir, 'qa_valid.txt'), 'w') as f:
         for item in tqdm(valid):
-            question = item['rewrite']
+            question = item['question']
             if '[' in question or ']' in question:
                 question = question.replace('[', '').replace(']', '')
             answer = item['answer']
@@ -234,7 +220,7 @@ def encode_kbqa(args, vocab):
         pickle.dump(adj_list, f)
     
     datasets = []
-    for dataset in ['train', 'test', 'valid']:
+    for dataset in ['train', 'valid']:
         with open(os.path.join(args.output_dir, 'qa_%s.txt'%(dataset)), 'r') as f:
             filtered_data = []
             for qa in f:
@@ -243,9 +229,8 @@ def encode_kbqa(args, vocab):
             json.dump(filtered_data, open(os.path.join(args.output_dir, '%s.json'%(dataset)), 'w'))
             datasets.append(filtered_data)
     
-    train_set, test_set, val_set = datasets[0], datasets[1], datasets[2]
+    train_set, val_set = datasets[0], datasets[1]
     print('size of training data: {}'.format(len(train_set)))
-    print('size of test data: {}'.format(len(test_set)))
     print('size of valid data: {}'.format(len(val_set)))
     print('Build question vocabulary')
     word_counter = Counter()
@@ -264,7 +249,7 @@ def encode_kbqa(args, vocab):
     with open(os.path.join(args.output_dir, 'vocab.json'), 'w') as f:
         json.dump(vocab, f, indent=2)
 
-    for name, dataset in zip(('train', 'val', 'test'), (train_set, val_set, test_set)):
+    for name, dataset in zip(('train', 'val'), (train_set, val_set)):
         print('Encode {} set'.format(name))
         outputs = encode_dataset(vocab, dataset)
         print('shape of questions, topic_entities, answers:')
@@ -297,20 +282,17 @@ def encode_dataset(vocab, dataset):
             
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_dir', default = '/data/csl/resources/KBQA_datasets/KQAPro', type = str)
-    parser.add_argument('--output_dir', default = '/data/csl/exp/EmbedKGQA/data/KQAPro', type = str)
+    parser.add_argument('--input_dir', required = True, type = str)
+    parser.add_argument('--output_dir', required = True, type = str)
     parser.add_argument('--setting', default = 'attr_qualifier', type = str)
-    parser.add_argument('--qa_type', default = 'all', type = str)
     parser.add_argument('--min_cnt', type=int, default=1)
     parser.add_argument('--stop_thresh', type=int, default=1000)
     parser.add_argument('--replace_es', type = int, default = 1)
     args = parser.parse_args()
     print(args)
-    # args.output_dir = args.output_dir + '_' + args.setting + '_' + args.qa_type
     if not os.path.isdir(args.output_dir):
         os.makedirs(args.output_dir)
     get_kbqa(args)
-    # get_qa(args)
     vocab = {
         'word2id': init_word2id(),
         'entity2id': init_entity2id(),

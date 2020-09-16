@@ -37,22 +37,18 @@ def validate(model, data, device):
 def train(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    logging.info("Create train_loader, val_loader and test_loader.........")
+    logging.info("Create train_loader, val_loader.........")
     vocab_json = os.path.join(args.input_dir, 'vocab.json')
     train_pt = os.path.join(args.input_dir, 'train.pt')
     val_pt = os.path.join(args.input_dir, 'val.pt')
-    test_pt = os.path.join(args.input_dir, 'test.pt')
     train_loader = DataLoader(vocab_json, train_pt, args.batch_size, training=True)
     val_loader = DataLoader(vocab_json, val_pt, args.batch_size)
-    test_loader = DataLoader(vocab_json, test_pt, args.batch_size)
     vocab = train_loader.vocab
 
     logging.info("Create model.........")
     model = SRN(args, args.dim_word, args.dim_hidden, vocab)
     logging.info("Load pretrained word vectors.........")
     pretrained = load_glove(args.glove_pt, vocab['id2word'])
-    # with torch.no_grad():
-    # model.word_embeddings.weight.set_(torch.Tensor(pretrained))
     model.word_embeddings.weight.data = torch.Tensor(pretrained)
     model = model.to(device)
     logging.info(model)
@@ -67,7 +63,6 @@ def train(args):
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[3], gamma=0.1)
 
     validate(model, val_loader, device)
-    validate(model, test_loader, device)
     meters = MetricLogger(delimiter="  ")
     logging.info("Start training........")
     best_model= copy.deepcopy(model.state_dict())
@@ -99,7 +94,8 @@ def train(args):
                         lr=optimizer.param_groups[0]["lr"],
                     )
                 )
-            # break
+            break
+
         
         acc = validate(model, val_loader, device)
         if acc > best_acc + eps:
@@ -107,8 +103,6 @@ def train(args):
             no_update = 0
             best_model = copy.deepcopy(model.state_dict())
             logging.info("Validation accuracy increased from previous epoch {}".format(acc))
-            acc = validate(model, test_loader, device)
-            logging.info('Test score for best valid so far: {}'.format(acc))
             torch.save(model.state_dict(), os.path.join(args.save_dir, '%s-%s-%s-%s.pt'%(args.opt, str(args.lr), str(args.bandwidth), str(epoch))))
         elif (acc < best_acc + eps) and (no_update < args.patience):
             no_update +=1
@@ -128,7 +122,7 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--glove_pt', default='/data/csl/resources/word2vec/glove.840B.300d.py36.pt')
+    parser.add_argument('--glove_pt', required=True)
 
     # training parameters
     parser.add_argument('--lr', default=0.001, type=float)
@@ -151,7 +145,6 @@ def main():
     parser.add_argument('--beam_size', default = 32, type = int)
     parser.add_argument('--log_name', default = 'log.txt', type = str)
     parser.add_argument('--model_name', default = 'model.pt', type = str)
-    parser.add_argument('--rel', action = 'store_true')
     parser.add_argument('--patience', default = 10, type = int)
     args = parser.parse_args()
 

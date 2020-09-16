@@ -275,7 +275,7 @@ class SRN(nn.Module):
             last_h = torch.gather(last_h, 2, idx.unsqueeze(0).unsqueeze(-1).expand(3, bsz, k, dim_hidden)).view(3, bsz * k, dim_hidden)
             next_r, next_e = torch.gather(action_space[0].view(bsz, -1), 1, idx).view(-1), torch.gather(action_space[1].view(bsz, -1), 1, idx).view(-1) # [num_layers, bsz * k, dim_hidden]
             log_action_prob = torch.gather(log_action_dist, 1, idx).view(-1)
-            action_beam_offset = idx / action_space_size # [bsz, k]
+            action_beam_offset = idx // action_space_size # [bsz, k]
             action_batch_offset = (torch.arange(bsz) * last_k).unsqueeze(-1).to(last_h.device) # [bsz, 1]
             action_offset = (action_batch_offset + action_beam_offset).view(-1) # [bsz, k] => [bsz * k]
             return (next_r, next_e), log_action_prob, last_h, action_offset
