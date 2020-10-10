@@ -9,6 +9,7 @@
 python -m utils.pickle_glove --input <path/of/glove.840B.300d.txt> --output <path/of/glove/pt>
 ```
 This step can be skipped if you have obtained the glove pickle file in other models.
+
 2. Preprocess the training data, and copy the `./dataset/kb.json` into `output_dir`
 ```
 python -m Program.preprocess --input_dir ./dataset --output_dir <dir/of/processed/files>
