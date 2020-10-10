@@ -91,15 +91,15 @@ sudo ./isql
 
 7. Import our kb by executing these commands in terminal:
 ```
-SPARQL CREATE GRAPH <graph_name>;
-SPARQL CLEAR GRAPH <graph_name>;
+SPARQL CREATE GRAPH <[graph_name]>;
+SPARQL CLEAR GRAPH <[graph_name]>;
 delete from db.dba.load_list;
-ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad', 'kb.ttl', '<graph_name>');
+ld_dir('/usr/local/virtuoso-opensource/share/virtuoso/vad', 'kb.ttl', '[graph_name]');
 rdf_loader_run();
 select * from DB.DBA.load_list;
 exit;
 ```
-`<graph_name>` could be any legal string, such as *KQAPro*.
+`[graph_name]` could be any legal string, such as *KQAPro*.
 You are success if `rdf_loader_run()` lasts for about 10 seconds.
 
 
