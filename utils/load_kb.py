@@ -1,9 +1,9 @@
 import json
 from collections import Counter
-from utils import init_vocab
+from utils.misc import init_vocab
 from datetime import date
 from queue import Queue
-from value_class import ValueClass
+from utils.value_class import ValueClass
 
 """
 knowledge json format:
