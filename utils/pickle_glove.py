@@ -10,10 +10,13 @@ def main():
     args = parser.parse_args()
 
     res = {}
-    for line in tqdm(open(args.input)):
-        word, *vec = line.strip().split()
-        vec = np.asarray(map(float, vec))
-        res[word] = vec
+    for line in tqdm(open(args.input, encoding="latin-1")):
+        word, *vec = line.split()
+        try:
+            vec = np.asarray(list(map(float, vec)))
+            res[word] = vec
+        except:
+            print("bad word")
 
     with open(args.output, 'wb') as f:
         pickle.dump(res, f)

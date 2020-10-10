@@ -71,8 +71,7 @@ Find the item `CheckpointInterval`, and change its value from default 60 to 0, t
 
 4. Start up the virtuoso service:
 ```
-cd /usr/local/virtuoso-opensource/bin
-sudo -H -u virtuoso virtuoso-t -f &
+sudo -H -u virtuoso ../../../../bin/virtuoso-t -f &
 ```
 Now you can access the service via the default port 8890.
 Enter `[ip]:8890` in a browser, you will see the virtuoso service page.
