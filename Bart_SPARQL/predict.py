@@ -177,7 +177,7 @@ def predict(args, kb, model, data, device, tokenizer):
             # break
         outputs = [tokenizer.decode(output_id, skip_special_tokens = True, clean_up_tokenization_spaces = True) for output_id in all_outputs]
         pred_sparql = [post_process(output) for output in outputs]
-        with open('test_answer.txt', 'w') as f:
+        with open(os.path.join(args.save_dir, 'predict.txt'), 'w') as f:
             for sparql in tqdm(pred_sparql):
                 pred_answer = get_sparql_answer(sparql, kb)
 
@@ -225,7 +225,6 @@ def main():
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--model_name_or_path', default = '/data/csl/resources/Bart/bart-base')
     parser.add_argument('--ckpt', required=True)
 
     # training parameters
