@@ -8,6 +8,8 @@ This repo implements several baselines for the dataset:
 - [SRN](https://dl.acm.org/doi/10.1145/3336191.3371812) (Stepwise Relational Networks)
 - Attention-based seq2seq SPARQL parser
 - Attention-based seq2seq program parser
+- Bart-based seq2seq SPARQL parser
+- Bart-based seq2seq program parser
 
 Instructions of how to run these models are described in their README files.
 Before trying them, you need to first download the [dataset](https://cloud.tsinghua.edu.cn/f/26d05edaa5d0480bb3ae/?dl=1) and unzip it into the folder `./dataset`.
