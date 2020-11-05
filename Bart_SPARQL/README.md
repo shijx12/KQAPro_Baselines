@@ -113,14 +113,14 @@ virtuoso_graph_uri = 'sjx'
 Change `virtuoso_address` to your service url (you can visit it in your browser to check whether it is valid) and change `virtuoso_graph_uri` to your `<graph_name>`.
 2. Preprocess the training data
 ```
-python -m SPARQL.preprocess --input_dir ./dataset --output_dir <dir/of/processed/files> --model_name_or_path <dir/of/pretrained/BartModel>
+python -m Bart_SPARQL.preprocess --input_dir ./dataset --output_dir <dir/of/processed/files> --model_name_or_path <dir/of/pretrained/BartModel>
 cp ./dataset/kb.json <dir/of/processed/files>
 ```
 3. Train
 ```
-python -m SPARQL.train --input_dir <dir/of/processed/files> --save_dir <dir/of/checkpoint> --model_name_or_path <dir/of/pretrained/BartModel>
+python -m Bart_SPARQL.train --input_dir <dir/of/processed/files> --output_dir <dir/of/checkpoint> --model_name_or_path <dir/of/pretrained/BartModel> --save_dir <dir/of/log/files>
 ```
 4. Predict answers of the test set. It will produce a file named `predict.txt` in the `--save_dir`, storing the predictions of test questions in order.
 ```
-python -m SPARQL.predict --input_dir <dir/of/processed/files> --ckpt <dir/of/checkpoint> --save_dir <dir/of/saved/files>
+python -m SPARQL.predict --input_dir <dir/of/processed/files> --ckpt <dir/of/checkpoint> --save_dir <dir/of/log/files>
 ```
