@@ -16,7 +16,7 @@ import logging
 import time
 from utils.lr_scheduler import get_linear_schedule_with_warmup
 import re
-from V2_Bart_Program.executor_rule import RuleExecutor
+from Bart_Program.executor_rule import RuleExecutor
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
