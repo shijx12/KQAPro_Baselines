@@ -124,3 +124,7 @@ python -m Bart_SPARQL.train --input_dir <dir/of/processed/files> --output_dir <d
 ```
 python -m SPARQL.predict --input_dir <dir/of/processed/files> --ckpt <dir/of/checkpoint> --save_dir <dir/of/log/files>
 ```
+
+## Checkpoints
+1. The pretrained Bart-base checkpoint without finetuning can be downloaded here [bart-base](https://cloud.tsinghua.edu.cn/f/3b59ec6c43034cfc8841/?dl=1)
+2. The checkpoint for finetuned Bart_SPARQL can be downloaded here [finetuned](https://cloud.tsinghua.edu.cn/f/1b9746dcd96b4fca870d/?dl=1)
