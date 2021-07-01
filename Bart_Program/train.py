@@ -8,7 +8,7 @@ import json
 from tqdm import tqdm
 from datetime import date
 from utils.misc import MetricLogger, seed_everything, ProgressBar
-# from utils.load_kb import DataForSPARQL
+from utils.load_kb import DataForSPARQL
 from .data import DataLoader
 from transformers import BartConfig, BartForConditionalGeneration, BartTokenizer
 # from .sparql_engine import get_sparql_answer
@@ -16,7 +16,8 @@ import torch.optim as optim
 import logging
 import time
 from utils.lr_scheduler import get_linear_schedule_with_warmup
-
+from Bart_Program.predict import validate
+from Bart_Program.executor_rule import RuleExecutor
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
@@ -32,10 +33,11 @@ def train(args):
     train_pt = os.path.join(args.input_dir, 'train.pt')
     val_pt = os.path.join(args.input_dir, 'val.pt')
     train_loader = DataLoader(vocab_json, train_pt, args.batch_size, training=True)
-    val_loader = DataLoader(vocab_json, val_pt, args.batch_size)
+    val_loader = DataLoader(vocab_json, val_pt, 64)
 
     vocab = train_loader.vocab
-    
+    kb = DataForSPARQL(os.path.join(args.input_dir, 'kb.json'))
+    rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'))
     logging.info("Create model.........")
     config_class, model_class, tokenizer_class = (BartConfig, BartForConditionalGeneration, BartTokenizer)
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
@@ -83,7 +85,7 @@ def train(args):
         logging.info("  Will skip the first %d steps in the first epoch", steps_trained_in_current_epoch)
     logging.info('Checking...')
     logging.info("===================Dev==================")
-    # evaluate(args, model, val_loader, device)
+    validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
     tr_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
     prefix = 25984
@@ -119,9 +121,10 @@ def train(args):
                 scheduler.step()  # Update learning rate schedule
                 model.zero_grad()
                 global_step += 1
-            # if args.logging_steps > 0 and global_step % args.logging_steps == 0:
-            #     logging.info("===================Dev==================")
-            #     evaluate(args, model, val_loader, device)
+            if args.logging_steps > 0 and global_step % args.logging_steps == 0:
+                logging.info("===================Dev==================")
+                validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
+
             #     logging.info("===================Test==================")
             #     evaluate(args, model, test_loader, device)
             if args.save_steps > 0 and global_step % args.save_steps == 0:

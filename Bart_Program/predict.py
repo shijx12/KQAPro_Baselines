@@ -101,7 +101,7 @@ def predict(args, kb, model, data, device, tokenizer, executor):
                     inputs_list.append(inputs)
                 ans = executor.forward(func_list, inputs_list, ignore_error = True)
                 if ans == None:
-                    ans = 'None'
+                    ans = 'no'
                 f.write(ans + '\n')
 def validate(args, kb, model, data, device, tokenizer, executor):
     model.eval()
@@ -148,6 +148,8 @@ def validate(args, kb, model, data, device, tokenizer, executor):
                 func_list.append(func)
                 inputs_list.append(inputs)
             ans = executor.forward(func_list, inputs_list, ignore_error = True)
+            if ans == None:
+                ans = 'no'
             if ans == a:
                 correct += 1
             count += 1
