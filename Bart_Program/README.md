@@ -21,3 +21,7 @@ python -m Bart_Program.predict --input_dir <dir/of/processed/files> --save_dir <
 ## Checkpoints
 1. The pretrained Bart-base checkpoint without finetuning can be downloaded here [bart-base](https://cloud.tsinghua.edu.cn/f/3b59ec6c43034cfc8841/?dl=1)
 2. The checkpoint for finetuned Bart_Program can be downloaded here [finetuned](https://cloud.tsinghua.edu.cn/f/1b9746dcd96b4fca870d/?dl=1)
+
+## Change Log
+
+- A different serializer and add special token in the tokenizer. Note that the argument is <dir/of/processed/files> for --model_name_or_path for Bart_Program.train
