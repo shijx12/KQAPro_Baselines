@@ -16,31 +16,36 @@ import re
 from utils.misc import init_vocab
 from transformers import *
 
-
+new_tokens = ['<func>', '<arg>']
 
 def get_program_seq(program):
     seq = []
     for item in program:
         func = item['function']
         inputs = item['inputs']
-        seq.append(func + '(' + '<c>'.join(inputs) + ')')
-    seq = '<b>'.join(seq)
-    # print(program)
-    # print(seq)
+        args = ''
+        for input in inputs:
+            args += ' <arg> ' + input
+        seq.append(func + args)
+        # seq.append(func + '(' + '<c>'.join(inputs) + ')')
+    seq = ' <func> '.join(seq)
     return seq
 
 def encode_dataset(dataset, vocab, tokenizer, test = False):
     questions = []
     programs = []
     for item in tqdm(dataset):
-        question = item['question']
+        question = item['rewrite']
         questions.append(question)
         if not test:
             program = item['program']
             program = get_program_seq(program)
+            # print(program)
             programs.append(program)
     sequences = questions + programs
+    print('tokenizing')
     encoded_inputs = tokenizer(sequences, padding = True)
+    print('tokenize ended.')
     print(encoded_inputs.keys())
     print(encoded_inputs['input_ids'][0])
     print(tokenizer.decode(encoded_inputs['input_ids'][0]))
@@ -53,7 +58,7 @@ def encode_dataset(dataset, vocab, tokenizer, test = False):
     choices = []
     answers = []
     for item in tqdm(dataset):
-        question = item['question']
+        question = item['rewrite']
         questions.append(question)
         _ = [vocab['answer_token_to_idx'][w] for w in item['choices']]
         choices.append(_)
@@ -105,7 +110,14 @@ def main():
         json.dump(vocab, f, indent=2)
     for k in vocab:
         print('{}:{}'.format(k, len(vocab[k])))
+    model = BartForConditionalGeneration.from_pretrained(args.model_name_or_path)
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
+    for token in new_tokens:
+        tokenizer.add_tokens(token, special_tokens = True)
+    if len(new_tokens) > 0:
+        model.resize_token_embeddings(len(tokenizer))
+    model.save_pretrained(os.path.join(args.output_dir, 'model'))
+    tokenizer.save_pretrained(os.path.join(args.output_dir, "tokenizer"))
     for name, dataset in zip(('train', 'val', 'test'), (train_set, val_set, test_set)):
         print('Encode {} set'.format(name))
         outputs = encode_dataset(dataset, vocab, tokenizer, name=='test')

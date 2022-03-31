@@ -22,7 +22,7 @@ logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
 import warnings
 warnings.simplefilter("ignore") # hide warnings that caused by invalid sparql query
-
+from termcolor import colored
 
 def post_process(text):
     pattern = re.compile(r'".*?"')
@@ -74,35 +74,32 @@ def predict(args, kb, model, data, device, tokenizer, executor):
                 max_length = 500,
             )
 
-            all_outputs.extend(outputs.cpu().numpy())
-            break
-        
+            all_outputs.extend(outputs.cpu().numpy())        
         outputs = [tokenizer.decode(output_id, skip_special_tokens = True, clean_up_tokenization_spaces = True) for output_id in all_outputs]
-        # questions = [tokenizer.decode(source_id, skip_special_tokens = True, clean_up_tokenization_spaces = True) for source_id in all_answers]
         with open(os.path.join(args.save_dir, 'predict.txt'), 'w') as f:
             for output in tqdm(outputs):
-                chunks = output.split('<b>')
+                chunks = output.split('<func>')
                 func_list = []
                 inputs_list = []
                 for chunk in chunks:
-                    # print(chunk)
-                    res = pattern.findall(chunk)
-                    # print(res)
-                    if len(res) == 0:
-                        continue
-                    res = res[0]
-                    func, inputs = res[0], res[1]
-                    if inputs == '':
+                    chunk = chunk.strip()
+                    res = chunk.split('<arg>')
+                    res = [_.strip() for _ in res]
+                    if len(res) > 0:
+                        func = res[0]
                         inputs = []
-                    else:
-                        inputs = inputs.split('<c>')
-                    
-                    func_list.append(func)
-                    inputs_list.append(inputs)
+                        if len(res) > 1:
+                            for x in res[1:]:
+                                inputs.append(x)
+                        else:
+                            inputs = []
+                        func_list.append(func)
+                        inputs_list.append(inputs)
                 ans = executor.forward(func_list, inputs_list, ignore_error = True)
                 if ans == None:
                     ans = 'no'
                 f.write(ans + '\n')
+                
 def validate(args, kb, model, data, device, tokenizer, executor):
     model.eval()
     count, correct = 0, 0
@@ -119,35 +116,32 @@ def validate(args, kb, model, data, device, tokenizer, executor):
 
             all_outputs.extend(outputs.cpu().numpy())
             all_answers.extend(answer.cpu().numpy())
-            # break
         
         outputs = [tokenizer.decode(output_id, skip_special_tokens = True, clean_up_tokenization_spaces = True) for output_id in all_outputs]
         given_answer = [data.vocab['answer_idx_to_token'][a] for a in all_answers]
-        # questions = [tokenizer.decode(source_id, skip_special_tokens = True, clean_up_tokenization_spaces = True) for source_id in all_answers]
-        # total = []
         for a, output in tqdm(zip(given_answer, outputs)):
-            # print(output)
-            # print(output)
-            # print(output)
-            chunks = output.split('<b>')
+            chunks = output.split('<func>')
             func_list = []
             inputs_list = []
             for chunk in chunks:
-                # print(chunk)
-                res = pattern.findall(chunk)
-                # print(res)
-                if len(res) == 0:
-                    continue
-                res = res[0]
-                func, inputs = res[0], res[1]
-                if inputs == '':
+                chunk = chunk.strip()
+                res = chunk.split('<arg>')
+                res = [_.strip() for _ in res]
+                if len(res) > 0:
+                    func = res[0]
                     inputs = []
-                else:
-                    inputs = inputs.split('<c>')
-                
-                func_list.append(func)
-                inputs_list.append(inputs)
+                    if len(res) > 1:
+                        for x in res[1:]:
+                            inputs.append(x)
+                    else:
+                        inputs = []
+                    func_list.append(func)
+                    inputs_list.append(inputs)
             ans = executor.forward(func_list, inputs_list, ignore_error = True)
+            if ans != a:
+                print(colored(output, 'red'))
+                print(func_list)
+                print(inputs_list)
             if ans == None:
                 ans = 'no'
             if ans == a:
@@ -173,21 +167,19 @@ def train(args):
     kb = DataForSPARQL(os.path.join(args.input_dir, 'kb.json'))
     logging.info("Create model.........")
     config_class, model_class, tokenizer_class = (BartConfig, BartForConditionalGeneration, BartTokenizer)
-    tokenizer = tokenizer_class.from_pretrained(args.ckpt)
-    model = model_class.from_pretrained(args.ckpt)
+    tokenizer = tokenizer_class.from_pretrained(os.path.join(args.ckpt, 'tokenizer'))
+    model = model_class.from_pretrained(os.path.join(args.ckpt, 'model'))
     model = model.to(device)
     logging.info(model)
     rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'))
     # validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
     predict(args, kb, model, val_loader, device, tokenizer, rule_executor)
-
     # vis(args, kb, model, val_loader, device, tokenizer)
 def main():
     parser = argparse.ArgumentParser()
     # input and output
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--save_dir', required=True, help='path to save checkpoints and logs')
-    parser.add_argument('--model_name_or_path', required = True)
     parser.add_argument('--ckpt', required=True)
 
     # training parameters

@@ -40,8 +40,10 @@ def train(args):
     rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'))
     logging.info("Create model.........")
     config_class, model_class, tokenizer_class = (BartConfig, BartForConditionalGeneration, BartTokenizer)
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    model = model_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(os.path.join(args.model_name_or_path, 'tokenizer'))
+    model = model_class.from_pretrained(os.path.join(args.model_name_or_path, 'model'))
+    # tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    # model = model_class.from_pretrained(args.model_name_or_path)
     model = model.to(device)
     logging.info(model)
     t_total = len(train_loader) // args.gradient_accumulation_steps * args.num_train_epochs    # Prepare optimizer and schedule (linear warmup and decay)
@@ -88,7 +90,6 @@ def train(args):
     validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
     tr_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
-    prefix = 25984
     for _ in range(int(args.num_train_epochs)):
         pbar = ProgressBar(n_total=len(train_loader), desc='Training')
         for step, batch in enumerate(train_loader):
@@ -108,7 +109,7 @@ def train(args):
                 "input_ids": source_ids.to(device),
                 "attention_mask": source_mask.to(device),
                 "decoder_input_ids": y_ids.to(device),
-                "lm_labels": lm_labels.to(device),
+                "labels": lm_labels.to(device),
             }
             outputs = model(**inputs)
             loss = outputs[0]
@@ -121,27 +122,30 @@ def train(args):
                 scheduler.step()  # Update learning rate schedule
                 model.zero_grad()
                 global_step += 1
-            if args.logging_steps > 0 and global_step % args.logging_steps == 0:
-                logging.info("===================Dev==================")
-                validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
+            # break
+            # if args.logging_steps > 0 and global_step % args.logging_steps == 0:
+                # logging.info("===================Dev==================")
+                # validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
 
             #     logging.info("===================Test==================")
             #     evaluate(args, model, test_loader, device)
-            if args.save_steps > 0 and global_step % args.save_steps == 0:
+            # if args.save_steps > 0 and global_step % args.save_steps == 0:
                     # Save model checkpoint
-                    output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step + prefix))
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    model_to_save = (
-                        model.module if hasattr(model, "module") else model
-                    )  # Take care of distributed/parallel training
-                    model_to_save.save_pretrained(output_dir)
-                    torch.save(args, os.path.join(output_dir, "training_args.bin"))
-                    logging.info("Saving model checkpoint to %s", output_dir)
-                    tokenizer.save_vocabulary(output_dir)
-                    torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
-                    torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
-                    logging.info("Saving optimizer and scheduler states to %s", output_dir)
+        validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
+        output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        model_to_save = (
+            model.module if hasattr(model, "module") else model
+        )  # Take care of distributed/parallel training
+        model_to_save.save_pretrained(os.path.join(output_dir, 'model'))
+        tokenizer.save_pretrained(os.path.join(output_dir, 'tokenizer'))
+        torch.save(args, os.path.join(output_dir, "training_args.bin"))
+        logging.info("Saving model checkpoint to %s", output_dir)
+        # tokenizer.save_vocabulary(output_dir)
+        torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+        torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
+        logging.info("Saving optimizer and scheduler states to %s", output_dir)
         logging.info("\n")
         if 'cuda' in str(device):
             torch.cuda.empty_cache()
