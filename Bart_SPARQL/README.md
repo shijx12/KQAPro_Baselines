@@ -1,9 +1,9 @@
 ## Requirements
-- python3
-- rdflib=4.2.2
+- python3.7
+- rdflib=4.2.2 or 6.1.1
 - transformers
 ---
-**Note:** 
+**Note for rdflib=4.2.2:** 
 After installing rdflib via `pip` or `anaconda` or some other tools, we need to fix some bugs of it.
 
 First, find your rdflib location. One possible way is to run following codes in ipython 
@@ -22,6 +22,8 @@ Note that *Line 67* is a comment of `# is this bnode the subject of more triplet
 
 Finally, open `plugins/serializers/turtle.py`, find *Line 328*, change `use_plain=True` to `use_plain=False`
 
+**Note for rdflib=6.1.1:** 
+If you have an erro " can't set attribute" with rdflib=4.2.2,you should try rdflib=6.1.1 
 ---
 
 - SPARQLWrapper=1.8.4
@@ -76,6 +78,13 @@ sudo -H -u virtuoso ../../../../bin/virtuoso-t -f &
 ```
 Now you can access the service via the default port 8890.
 Enter `[ip]:8890` in a browser, you will see the virtuoso service page.
+
+[note] The virtuoso may report an erro "There is no configuration file virtuoso.ini" when start up. 
+```
+sudo vim /etc/rc.conf
+```
+virtuoso_config="/usr/local/lib/virtuoso/db/virtuoso.ini"
+
 
 5. Now we can import our kb into virtuoso. Before that, we need to convert our kb to `ttl` format and move it to proper position:
 ```
