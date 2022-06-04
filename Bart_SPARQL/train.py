@@ -107,7 +107,7 @@ def train(args):
                 "input_ids": source_ids.to(device),
                 "attention_mask": source_mask.to(device),
                 "decoder_input_ids": y_ids.to(device),
-                "lm_labels": lm_labels.to(device),
+                "labels": lm_labels.to(device)
             }
             outputs = model(**inputs)
             loss = outputs[0]
