@@ -3,7 +3,7 @@
 - rdflib=4.2.2 or 6.1.1
 - transformers
 ---
-**Note for rdflib=4.2.2:** 
+**Note for rdflib 4.2.2:** 
 After installing rdflib via `pip` or `anaconda` or some other tools, we need to fix some bugs of it.
 
 First, find your rdflib location. One possible way is to run following codes in ipython 
@@ -22,8 +22,10 @@ Note that *Line 67* is a comment of `# is this bnode the subject of more triplet
 
 Finally, open `plugins/serializers/turtle.py`, find *Line 328*, change `use_plain=True` to `use_plain=False`
 
-**Note for rdflib=6.1.1:** 
-If you have an erro " can't set attribute" with rdflib=4.2.2,you should try rdflib=6.1.1 
+
+**Note for rdflib 6.1.1:** 
+If you have an erro " can't set attribute" with rdflib=4.2.2,you should try rdflib=6.1.1 .
+
 ---
 
 - SPARQLWrapper=1.8.4
@@ -131,7 +133,7 @@ python -m Bart_SPARQL.train --input_dir <dir/of/processed/files> --output_dir <d
 ```
 4. Predict answers of the test set. It will produce a file named `predict.txt` in the `--save_dir`, storing the predictions of test questions in order.
 ```
-python -m SPARQL.predict --input_dir <dir/of/processed/files> --ckpt <dir/of/checkpoint> --save_dir <dir/of/log/files>
+python -m Bart_SPARQL.predict --input_dir <dir/of/processed/files> --ckpt <dir/of/checkpoint> --save_dir <dir/of/log/files>
 ```
 
 ## Checkpoints
