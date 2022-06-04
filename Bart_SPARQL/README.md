@@ -85,7 +85,7 @@ Enter `[ip]:8890` in a browser, you will see the virtuoso service page.
 ```
 sudo vim /etc/rc.conf
 ```
-Add a line：`virtuoso_config="/usr/local/lib/virtuoso/db/virtuoso.ini"`
+Add a line：`virtuoso_config="/usr/local/virtuoso-opensource/var/lib/virtuoso/db/virtuoso.ini"`
 
 
 5. Now we can import our kb into virtuoso. Before that, we need to convert our kb to `ttl` format and move it to proper position:
