@@ -35,7 +35,7 @@ def encode_dataset(dataset, vocab, tokenizer, test = False):
     questions = []
     programs = []
     for item in tqdm(dataset):
-        question = item['rewrite']
+        question = item['question']
         questions.append(question)
         if not test:
             program = item['program']
@@ -58,7 +58,7 @@ def encode_dataset(dataset, vocab, tokenizer, test = False):
     choices = []
     answers = []
     for item in tqdm(dataset):
-        question = item['rewrite']
+        question = item['question']
         questions.append(question)
         _ = [vocab['answer_token_to_idx'][w] for w in item['choices']]
         choices.append(_)

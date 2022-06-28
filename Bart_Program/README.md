@@ -2,6 +2,7 @@
 - python3
 - pytorch>=1.2.0
 - transformers
+- termcolor
 
 ## How to run
 1. Preprocess the training data, and copy the `./dataset/kb.json` into `output_dir`

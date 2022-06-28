@@ -134,6 +134,7 @@ python -m Bart_SPARQL.train --input_dir <dir/of/processed/files> --output_dir <d
 4. Predict answers of the test set. It will produce a file named `predict.txt` in the `--save_dir`, storing the predictions of test questions in order.
 ```
 python -m Bart_SPARQL.predict --input_dir <dir/of/processed/files> --ckpt <dir/of/checkpoint> --save_dir <dir/of/log/files>
+
 ```
 
 ## Checkpoints
