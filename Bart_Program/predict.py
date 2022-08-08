@@ -3,12 +3,10 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import argparse
-import shutil
 import json
 from tqdm import tqdm
 from datetime import date
 from utils.misc import MetricLogger, seed_everything, ProgressBar
-from utils.load_kb import DataForSPARQL
 from .data import DataLoader
 from transformers import BartConfig, BartForConditionalGeneration, BartTokenizer
 import torch.optim as optim
@@ -16,7 +14,7 @@ import logging
 import time
 from utils.lr_scheduler import get_linear_schedule_with_warmup
 import re
-from Bart_Program.executor_rule import RuleExecutor
+from kopl.kopl import KoPLEngine
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
@@ -46,8 +44,6 @@ def post_process(text):
 
 def vis(args, kb, model, data, device, tokenizer):
     while True:
-        # text = 'Who is the father of Tony?'
-        # text = 'Donald Trump married Tony, where is the place?'
         text = input('Input your question:')
         with torch.no_grad():
             input_ids = tokenizer.batch_encode_plus([text], max_length = 512, pad_to_max_length = True, return_tensors="pt", truncation = True)
@@ -60,23 +56,23 @@ def vis(args, kb, model, data, device, tokenizer):
             outputs = [post_process(output) for output in outputs]
             print(outputs[0])
 
-def predict(args, kb, model, data, device, tokenizer, executor):
+def predict(args, model, data, device, tokenizer, executor):
     model.eval()
     count, correct = 0, 0
-    pattern = re.compile(r'(.*?)\((.*?)\)')
     with torch.no_grad():
         all_outputs = []
         for batch in tqdm(data, total=len(data)):
-            batch = batch[:3]
-            source_ids, source_mask, choices = [x.to(device) for x in batch]
+            source_ids = batch[0].to(device)
             outputs = model.generate(
                 input_ids=source_ids,
                 max_length = 500,
             )
 
-            all_outputs.extend(outputs.cpu().numpy())        
+            all_outputs.extend(outputs.cpu().numpy())
+        
         outputs = [tokenizer.decode(output_id, skip_special_tokens = True, clean_up_tokenization_spaces = True) for output_id in all_outputs]
         with open(os.path.join(args.save_dir, 'predict.txt'), 'w') as f:
+
             for output in tqdm(outputs):
                 chunks = output.split('<func>')
                 func_list = []
@@ -96,14 +92,17 @@ def predict(args, kb, model, data, device, tokenizer, executor):
                         func_list.append(func)
                         inputs_list.append(inputs)
                 ans = executor.forward(func_list, inputs_list, ignore_error = True)
-                if ans == None:
+                if ans is None:
                     ans = 'no'
+                if isinstance(ans, list) and len(ans) > 0:
+                    ans = ans[0]
+                if isinstance(ans, list) and len(ans) == 0:
+                    ans = 'None'
                 f.write(ans + '\n')
                 
-def validate(args, kb, model, data, device, tokenizer, executor):
+def validate(model, data, device, tokenizer, executor):
     model.eval()
     count, correct = 0, 0
-    pattern = re.compile(r'(.*?)\((.*?)\)')
     with torch.no_grad():
         all_outputs = []
         all_answers = []
@@ -138,12 +137,10 @@ def validate(args, kb, model, data, device, tokenizer, executor):
                     func_list.append(func)
                     inputs_list.append(inputs)
             ans = executor.forward(func_list, inputs_list, ignore_error = True)
-            if ans != a:
-                print(colored(output, 'red'))
-                print(func_list)
-                print(inputs_list)
-            if ans == None:
+            if ans is None:
                 ans = 'no'
+            if isinstance(ans, list) and len(ans) > 0:
+                ans = ans[0]
             if ans == a:
                 correct += 1
             count += 1
@@ -159,22 +156,18 @@ def train(args):
 
     logging.info("Create train_loader and val_loader.........")
     vocab_json = os.path.join(args.input_dir, 'vocab.json')
-    train_pt = os.path.join(args.input_dir, 'train.pt')
     val_pt = os.path.join(args.input_dir, 'test.pt')
-    train_loader = DataLoader(vocab_json, train_pt, args.batch_size, training=True)
     val_loader = DataLoader(vocab_json, val_pt, args.batch_size)
-    vocab = train_loader.vocab
-    kb = DataForSPARQL(os.path.join(args.input_dir, 'kb.json'))
     logging.info("Create model.........")
     config_class, model_class, tokenizer_class = (BartConfig, BartForConditionalGeneration, BartTokenizer)
-    tokenizer = tokenizer_class.from_pretrained(os.path.join(args.ckpt, 'tokenizer'))
-    model = model_class.from_pretrained(os.path.join(args.ckpt, 'model'))
+    tokenizer = tokenizer_class.from_pretrained(os.path.join(args.ckpt))
+    model = model_class.from_pretrained(os.path.join(args.ckpt))
     model = model.to(device)
     logging.info(model)
-    rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'))
-    # validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
-    predict(args, kb, model, val_loader, device, tokenizer, rule_executor)
-    # vis(args, kb, model, val_loader, device, tokenizer)
+    engine = KoPLEngine(json.load(open(os.path.join(args.input_dir, 'kb.json'))))
+    # validate(model, val_loader, device, tokenizer, engine)
+
+    predict(args, model, val_loader, device, tokenizer, engine)
 def main():
     parser = argparse.ArgumentParser()
     # input and output

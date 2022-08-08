@@ -3,27 +3,25 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import argparse
-import shutil
 import json
 from tqdm import tqdm
 from datetime import date
 from utils.misc import MetricLogger, seed_everything, ProgressBar
-from utils.load_kb import DataForSPARQL
 from .data import DataLoader
 from transformers import BartConfig, BartForConditionalGeneration, BartTokenizer
-# from .sparql_engine import get_sparql_answer
 import torch.optim as optim
 import logging
 import time
 from utils.lr_scheduler import get_linear_schedule_with_warmup
 from Bart_Program.predict import validate
-from Bart_Program.executor_rule import RuleExecutor
+from kopl.kopl import KoPLEngine
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s')
 logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 rootLogger = logging.getLogger()
 import warnings
 warnings.simplefilter("ignore") # hide warnings that caused by invalid sparql query
 
+new_tokens = ['<func>', '<arg>']
 
 def train(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -35,15 +33,16 @@ def train(args):
     train_loader = DataLoader(vocab_json, train_pt, args.batch_size, training=True)
     val_loader = DataLoader(vocab_json, val_pt, 64)
 
-    vocab = train_loader.vocab
-    kb = DataForSPARQL(os.path.join(args.input_dir, 'kb.json'))
-    rule_executor = RuleExecutor(vocab, os.path.join(args.input_dir, 'kb.json'))
+    engine = KoPLEngine(json.load(open(os.path.join(args.input_dir, 'kb.json'))))
     logging.info("Create model.........")
     config_class, model_class, tokenizer_class = (BartConfig, BartForConditionalGeneration, BartTokenizer)
-    tokenizer = tokenizer_class.from_pretrained(os.path.join(args.model_name_or_path, 'tokenizer'))
-    model = model_class.from_pretrained(os.path.join(args.model_name_or_path, 'model'))
-    # tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    # model = model_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    model = model_class.from_pretrained(args.model_name_or_path)
+    added_tokens_num = tokenizer.add_tokens(new_tokens, special_tokens = True)
+    print('added_tokens_num:', added_tokens_num)
+    if added_tokens_num > 0:
+        model.resize_token_embeddings(len(tokenizer))
+
     model = model.to(device)
     logging.info(model)
     t_total = len(train_loader) // args.gradient_accumulation_steps * args.num_train_epochs    # Prepare optimizer and schedule (linear warmup and decay)
@@ -87,7 +86,7 @@ def train(args):
         logging.info("  Will skip the first %d steps in the first epoch", steps_trained_in_current_epoch)
     logging.info('Checking...')
     logging.info("===================Dev==================")
-    validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
+    validate(model, val_loader, device, tokenizer, engine)
     tr_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
     for _ in range(int(args.num_train_epochs)):
@@ -122,24 +121,15 @@ def train(args):
                 scheduler.step()  # Update learning rate schedule
                 model.zero_grad()
                 global_step += 1
-            # break
-            # if args.logging_steps > 0 and global_step % args.logging_steps == 0:
-                # logging.info("===================Dev==================")
-                # validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
-
-            #     logging.info("===================Test==================")
-            #     evaluate(args, model, test_loader, device)
-            # if args.save_steps > 0 and global_step % args.save_steps == 0:
-                    # Save model checkpoint
-        validate(args, kb, model, val_loader, device, tokenizer, rule_executor)
+        validate(model, val_loader, device, tokenizer, engine)
         output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         model_to_save = (
             model.module if hasattr(model, "module") else model
         )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(os.path.join(output_dir, 'model'))
-        tokenizer.save_pretrained(os.path.join(output_dir, 'tokenizer'))
+        model_to_save.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
         torch.save(args, os.path.join(output_dir, "training_args.bin"))
         logging.info("Saving model checkpoint to %s", output_dir)
         # tokenizer.save_vocabulary(output_dir)

@@ -27,7 +27,6 @@ def get_program_seq(program):
         for input in inputs:
             args += ' <arg> ' + input
         seq.append(func + args)
-        # seq.append(func + '(' + '<c>'.join(inputs) + ')')
     seq = ' <func> '.join(seq)
     return seq
 
@@ -40,7 +39,6 @@ def encode_dataset(dataset, vocab, tokenizer, test = False):
         if not test:
             program = item['program']
             program = get_program_seq(program)
-            # print(program)
             programs.append(program)
     sequences = questions + programs
     print('tokenizing')
@@ -110,14 +108,9 @@ def main():
         json.dump(vocab, f, indent=2)
     for k in vocab:
         print('{}:{}'.format(k, len(vocab[k])))
-    model = BartForConditionalGeneration.from_pretrained(args.model_name_or_path)
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
     for token in new_tokens:
         tokenizer.add_tokens(token, special_tokens = True)
-    if len(new_tokens) > 0:
-        model.resize_token_embeddings(len(tokenizer))
-    model.save_pretrained(os.path.join(args.output_dir, 'model'))
-    tokenizer.save_pretrained(os.path.join(args.output_dir, "tokenizer"))
     for name, dataset in zip(('train', 'val', 'test'), (train_set, val_set, test_set)):
         print('Encode {} set'.format(name))
         outputs = encode_dataset(dataset, vocab, tokenizer, name=='test')
