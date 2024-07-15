@@ -110,6 +110,7 @@ def main():
         print('{}:{}'.format(k, len(vocab[k])))
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
     for token in new_tokens:
+        # NOTE: in some newer versions of transformers, the special_tokens needs to be set as False
         tokenizer.add_tokens(token, special_tokens = True)
     for name, dataset in zip(('train', 'val', 'test'), (train_set, val_set, test_set)):
         print('Encode {} set'.format(name))
